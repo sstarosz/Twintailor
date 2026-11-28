@@ -120,3 +120,22 @@ TEST_CASE("a chain of one kind of step is read from the left, and times before p
     EXPECT_NEAR((comesTo("1 + 2 * 3 - 4 / 2")), (5.0), "times and divide first");
     for (const char* half : {"1 +", "1 -", "1 *", "1 /"}) EXPECT((std::holds_alternative<TextError>(parseExpr(half, doc))), half);
 }
+
+TEST_CASE("a number in a formula is read and written in its own way")
+{
+    Document doc;
+    const auto written = [&](const char* text) {
+        const std::variant<Expr, TextError> parsed = parseExpr(text, doc);
+        return std::holds_alternative<Expr>(parsed) ? formatExpr(std::get<Expr>(parsed), doc) : std::get<TextError>(parsed).message;
+    };
+    CHECK(written(".5") == "0.5");
+    CHECK(written("5.") == "5");
+    CHECK(written("007") == "7");
+    CHECK(written(".") == "'.' is not a number");
+    CHECK(written("1.2.3") == "'1.2.3' is not a number");
+    CHECK(formatExpr(Expr(1.0 / 3.0), doc) == "0.3333333333");
+    CHECK(formatExpr(Expr(1e20), doc) == "1e+20");
+    CHECK(formatExpr(Expr(-100000.0), doc) == "-100000");
+    CHECK(formatValue(-0.001, Unit::Length) == "0 cm");
+    CHECK(formatValue(1234567.891, Unit::None) == "1234567.891");
+}

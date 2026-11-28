@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstddef>
 #include <limits>
+#include <ranges>
 
 #include "twintailor/core/Math.h"
 
@@ -34,7 +35,10 @@ struct Cubic {
     }
 };
 
-Cubic cubicOf(const Pattern& p, const Edge& e) { return {startOf(p, e), e.cubic->control1, e.cubic->control2, endOf(p, e)}; }
+// The free curve of an edge, `handles` being the edge's own.
+Cubic cubicOf(const Pattern& p, const Edge& e, const CubicCurve& handles) {
+    return {startOf(p, e), handles.control1, handles.control2, endOf(p, e)};
+}
 
 // ---- Arcs ---------------------------------------------------------------------
 
@@ -58,7 +62,7 @@ std::vector<double> rayHits(const Pattern& p, const Edge& e, Vec2 origin, Vec2 d
     if (e.cubic) {
         // Which side of the ray's line the curve is on changes sign at a
         // crossing; each piece that changes sign is narrowed down by halving.
-        const Cubic curve = cubicOf(p, e);
+        const Cubic curve = cubicOf(p, e, *e.cubic);
         const auto side = [&](double t) { return cross(curve.at(t) - origin, direction); };
         double t0 = 0.0, side0 = side(0.0);
         for (int i = 1; i <= cubicPieces; ++i) {
@@ -111,7 +115,7 @@ struct Location {
 double nearestParameter(const Pattern& p, const Edge& e, Vec2 point) {
     const Vec2 a = startOf(p, e);
     if (e.cubic) {
-        const Cubic curve = cubicOf(p, e);
+        const Cubic curve = cubicOf(p, e, *e.cubic);
         const auto distance = [&](double t) { return length(point - curve.at(t)); };
         int best = 0;
         for (int i = 1; i <= cubicPieces; ++i)
@@ -160,19 +164,17 @@ uint32_t splitAt(Pattern& p, Location where, const CornerRef& name) {
     if (length(point - endOf(p, whole)) < tolerance) return whole.end;
 
     Edge first = whole, second = whole;
-    if (whole.arc) {
-        first.arc->sweep = whole.arc->sweep * where.t;
-        second.arc->sweep = whole.arc->sweep * (1.0 - where.t);
-    }
+    if (first.arc) first.arc->sweep *= where.t;
+    if (second.arc) second.arc->sweep *= 1.0 - where.t;
     if (whole.cubic) {
         // De Casteljau: the two halves are exact pieces of the same curve.
-        const Cubic c = cubicOf(p, whole);
+        const Cubic c = cubicOf(p, whole, *whole.cubic);
         const Vec2 a = between(c.p0, c.p1, where.t), b = between(c.p1, c.p2, where.t), d = between(c.p2, c.p3, where.t);
         first.cubic = CubicCurve{a, between(a, b, where.t)};
         second.cubic = CubicCurve{between(b, d, where.t), d};
     }
 
-    const uint32_t vertex = static_cast<uint32_t>(p.vertices.size());
+    const auto vertex = static_cast<uint32_t>(p.vertices.size());
     p.vertices.push_back({name, point});
     first.end = vertex;
     second.start = vertex;
@@ -185,8 +187,7 @@ uint32_t splitAt(Pattern& p, Location where, const CornerRef& name) {
 std::vector<Edge> chain(const Pattern& p, uint32_t begin, uint32_t finish) {
     std::vector<Edge> edges;
     const std::size_t count = p.edges.size();
-    std::size_t i = 0;
-    while (i < count && p.edges[i].start != begin) ++i;
+    const auto i = static_cast<std::size_t>(std::ranges::find(p.edges, begin, &Edge::start) - p.edges.begin());
     for (std::size_t step = 0; step < count && i < count; ++step) {
         const Edge& e = p.edges[(i + step) % count];
         edges.push_back(e);
@@ -223,7 +224,7 @@ Vec2 reflect(Vec2 point, Vec2 a, Vec2 unitAlong) {
 
 Vec2 pointAt(const Pattern& p, const Edge& e, double t) {
     const Vec2 a = startOf(p, e);
-    if (e.cubic) return cubicOf(p, e).at(t);
+    if (e.cubic) return cubicOf(p, e, *e.cubic).at(t);
     if (!e.arc) return a + (endOf(p, e) - a) * t;
     const Arc& arc = *e.arc;
     const double angle = std::atan2(a.y - arc.center.y, a.x - arc.center.x) + radians(arc.sweep) * t;
@@ -247,7 +248,7 @@ std::optional<Nearest> nearest(const Pattern& p, Vec2 point) {
 double lengthOf(const Pattern& p, const Edge& e) {
     if (e.cubic) {
         // Simpson's rule on the curve's speed.
-        const Cubic curve = cubicOf(p, e);
+        const Cubic curve = cubicOf(p, e, *e.cubic);
         const int pieces = 2 * cubicPieces;
         double sum = length(curve.speed(0.0)) + length(curve.speed(1.0));
         for (int i = 1; i < pieces; ++i) sum += length(curve.speed(static_cast<double>(i) / pieces)) * (i % 2 == 1 ? 4.0 : 2.0);
@@ -283,7 +284,7 @@ std::optional<Arc> arcFromSweep(Vec2 a, Vec2 b, double sweep) {
 
 Problem moveCorners(Pattern& pattern, const std::vector<CornerMove>& moves) {
     const auto moved = [&](uint32_t vertex) {
-        return std::any_of(moves.begin(), moves.end(), [&](const CornerMove& m) { return m.vertex == vertex; });
+        return std::ranges::contains(moves, vertex, &CornerMove::vertex);
     };
     for (const Edge& e : pattern.edges)
         if (wholeTurn(e) && (moved(e.start) || moved(e.end)))
@@ -292,9 +293,10 @@ Problem moveCorners(Pattern& pattern, const std::vector<CornerMove>& moves) {
     // A free curve's handle at a corner travels with it.
     for (Edge& e : pattern.edges) {
         if (!e.cubic) continue;
+        CubicCurve& handles = *e.cubic;
         for (const CornerMove& m : moves) {
-            if (e.start == m.vertex) e.cubic->control1 = e.cubic->control1 + m.by;
-            if (e.end == m.vertex) e.cubic->control2 = e.cubic->control2 + m.by;
+            if (e.start == m.vertex) handles.control1 = handles.control1 + m.by;
+            if (e.end == m.vertex) handles.control2 = handles.control2 + m.by;
         }
     }
     // An arc keeps turning through the same angle, between the new ends. Every
@@ -327,9 +329,9 @@ std::optional<Vec2> firstHit(const Pattern& pattern, Vec2 origin, double angleDe
 }
 
 Problem addPoint(Pattern& pattern, const EdgeRef& edge, double along, const CornerRef& corner, const EdgeRef& after) {
-    const auto found = std::find_if(pattern.edges.begin(), pattern.edges.end(), [&](const Edge& e) { return e.name == edge; });
+    const auto found = std::ranges::find(pattern.edges, edge, &Edge::name);
     if (found == pattern.edges.end()) return "the edge to add a point to does not exist; an earlier operation may have removed it";
-    const std::size_t index = static_cast<std::size_t>(found - pattern.edges.begin());
+    const auto index = static_cast<std::size_t>(found - pattern.edges.begin());
     const std::size_t corners = pattern.vertices.size();
     splitAt(pattern, Location{index, along}, corner);
     if (pattern.vertices.size() == corners) return "the point would be on a corner that is already there; put it further along the edge";
@@ -374,9 +376,9 @@ Problem cut(Pattern& pattern, Vec2 from, Vec2 to, bool keepLeft,
 
 Problem mirror(Pattern& pattern, const EdgeRef& axis, OpId mirrorOp) {
     const std::size_t count = pattern.edges.size();
-    std::size_t axisIndex = 0;
-    while (axisIndex < count && !(pattern.edges[axisIndex].name == axis)) ++axisIndex;
-    if (axisIndex == count) return "the edge to mirror across does not exist";
+    const auto found = std::ranges::find(pattern.edges, axis, &Edge::name);
+    if (found == pattern.edges.end()) return "the edge to mirror across does not exist";
+    const auto axisIndex = static_cast<std::size_t>(found - pattern.edges.begin());
 
     const Edge axisEdge = pattern.edges[axisIndex];
     if (axisEdge.arc || axisEdge.cubic) return "the edge to mirror across must be straight";
@@ -409,14 +411,16 @@ Problem mirror(Pattern& pattern, const EdgeRef& axis, OpId mirrorOp) {
     // counter-clockwise. Reflecting and reversing an arc leaves its sweep as
     // is; a free curve's two control points swap places.
     std::vector<Edge> whole = half;
-    for (auto it = half.rbegin(); it != half.rend(); ++it) {
-        Edge copy = *it;
+    for (const Edge& original : half | std::views::reverse) {
+        Edge copy = original;
         copy.name.via.push_back(mirrorOp);
-        copy.start = imageOf(it->end);
-        copy.end = imageOf(it->start);
+        copy.start = imageOf(original.end);
+        copy.end = imageOf(original.start);
         if (copy.arc) copy.arc->center = reflect(copy.arc->center, a, unitAlong);
-        if (copy.cubic)
-            copy.cubic = CubicCurve{reflect(it->cubic->control2, a, unitAlong), reflect(it->cubic->control1, a, unitAlong)};
+        if (copy.cubic) {
+            const CubicCurve handles = *copy.cubic;
+            copy.cubic = CubicCurve{reflect(handles.control2, a, unitAlong), reflect(handles.control1, a, unitAlong)};
+        }
         whole.push_back(std::move(copy));
     }
     pattern.edges = std::move(whole);
@@ -427,7 +431,7 @@ Problem mirror(Pattern& pattern, const EdgeRef& axis, OpId mirrorOp) {
 void flip(Pattern& pattern) {
     forEachPoint(pattern, [](Vec2& p) { p.x = -p.x; });
     // The outline stays counter-clockwise: it is walked the other way round.
-    std::reverse(pattern.edges.begin(), pattern.edges.end());
+    std::ranges::reverse(pattern.edges);
     for (Edge& e : pattern.edges) {
         std::swap(e.start, e.end);
         if (e.cubic) std::swap(e.cubic->control1, e.cubic->control2);

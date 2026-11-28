@@ -1,34 +1,34 @@
 #include "twintailor/core/Document.h"
 
 #include <algorithm>
-#include <memory>
+#include <format>
+#include <ranges>
 #include <stdexcept>
 
 #include "internal/FieldAccess.h"
+#include "internal/Find.h"
 
 namespace twintailor {
 
 namespace {
 
 [[noreturn]] void unknown(const char* what) {
-    throw std::out_of_range(std::string("twintailor::Document: unknown ") + what);
+    throw std::out_of_range(std::format("twintailor::Document: unknown {}", what));
 }
 
 // The document keeps each kind of thing in a list of entries, each with its
 // `id`. The entry with this id, or nullptr.
 template <class Entries, class Id>
 auto* find(Entries& entries, Id id) {
-    const auto found = std::ranges::find(entries, id, [](const auto& e) { return e.id; });
-    return found == std::ranges::end(entries) ? nullptr : std::addressof(*found);
+    return findBy(entries, id, [](const auto& e) { return e.id; });
 }
 
 // An operation's entry, in whichever panel holds it; nullptr if none does.
 template <class Panels>
 auto* findOperation(Panels& panels, OpId operation) {
-    decltype(find(panels.front().operations, operation)) found = nullptr;
     for (auto& p : panels)
-        if ((found = find(p.operations, operation))) break;
-    return found;
+        if (auto* found = find(p.operations, operation)) return found;
+    return decltype(find(panels.front().operations, operation)){};
 }
 
 // What a find found; throws for a handle the document doesn't hold.
@@ -46,9 +46,8 @@ std::size_t drop(Entries& entries, Id id) {
 
 template <class Entries>
 auto idsOf(const Entries& entries) {
-    std::vector<decltype(entries.front().id)> ids;
-    ids.reserve(entries.size());
-    for (const auto& e : entries) ids.push_back(e.id);
+    std::vector<decltype(entries.front().id)> ids(entries.size());
+    std::ranges::transform(entries, ids.begin(), [](const auto& e) { return e.id; });
     return ids;
 }
 
@@ -60,9 +59,8 @@ PanelCopy::PanelCopy(PanelId panel, std::vector<std::pair<OpId, OpId>> operation
     : panel_(panel), operations_(std::move(operations)) {}
 
 OpId PanelCopy::operator[](OpId original) const {
-    for (const auto& [from, to] : operations_)
-        if (from == original) return to;
-    throw std::out_of_range("twintailor::PanelCopy: operation is not part of the copied panel");
+    return orThrow(findBy(operations_, original, &std::pair<OpId, OpId>::first),
+                   "twintailor::PanelCopy: operation is not part of the copied panel").second;
 }
 
 // ---- Private lookups --------------------------------------------------------
@@ -176,7 +174,7 @@ std::vector<SeamId> Document::sewAsSource(PanelId instance) {
     };
     // Whether `end` is sewn to the edge `edge` of such a follower of `other`.
     const auto sewnTo = [&](const SeamSide& end, const EdgeRef& edge, PanelId other) {
-        return std::any_of(seams_.begin(), seams_.end(), [&](const SeamEntry& e) {
+        return std::ranges::any_of(seams_, [&](const SeamEntry& e) {
             const auto joins = [&](const SeamSide& near, const SeamSide& far) { return near == end && far.edge == edge && alike(far.panel, other); };
             return joins(e.seam.a, e.seam.b) || joins(e.seam.b, e.seam.a);
         });
@@ -191,7 +189,7 @@ std::vector<SeamId> Document::sewAsSource(PanelId instance) {
         Seam copy = seam;
         if (fromA && fromB) {
             copy.a.panel = copy.b.panel = instance;
-            const bool there = std::any_of(seams_.begin(), seams_.end(), [&](const SeamEntry& e) {
+            const bool there = std::ranges::any_of(seams_, [&](const SeamEntry& e) {
                 return (e.seam.a == copy.a && e.seam.b == copy.b) || (e.seam.a == copy.b && e.seam.b == copy.a);
             });
             if (there) continue;
@@ -202,10 +200,11 @@ std::vector<SeamId> Document::sewAsSource(PanelId instance) {
             mine.panel = instance;
             if (sewnTo(mine, theirs.edge, neighbour)) continue;
             // The source itself is never the other side, even when it follows the neighbour.
-            const auto partner = std::find_if(panels_.rbegin(), panels_.rend(), [&](const PanelEntry& p) {
-                return !(p.id == source) && alike(p.id, neighbour) && !sewnTo({p.id, theirs.edge}, mine.edge, source);
+            auto newestFirst = panels_ | std::views::reverse;
+            const auto partner = std::ranges::find_if(newestFirst, [&](const PanelEntry& p) {
+                return p.id != source && alike(p.id, neighbour) && !sewnTo({p.id, theirs.edge}, mine.edge, source);
             });
-            if (partner == panels_.rend()) continue;
+            if (partner == newestFirst.end()) continue;
             theirs.panel = partner->id;
         }
         added.push_back(add(std::move(copy)));
@@ -221,7 +220,7 @@ void Document::set(OpId operation, FieldId field, Expr value) {
     *target = std::move(value);
 }
 
-void Document::set(OpId operation, ReferenceId reference, Reference value) {
+void Document::set(OpId operation, ReferenceId reference, const Reference& value) {
     switch (setReferenceAt(entry(operation).data, reference.index, value)) {
     case ReferenceChange::Done: return;
     case ReferenceChange::NoSuchReference: throw std::out_of_range("twintailor::Document: the operation has no such reference");
@@ -242,8 +241,8 @@ void Document::move(OpId operation, std::size_t index) {
     if (index >= ops.size()) throw std::out_of_range("twintailor::Document: move index is past the end of the panel");
     const auto it = std::ranges::find(ops, operation, &OperationEntry::id);
     const auto target = ops.begin() + static_cast<std::ptrdiff_t>(index);
-    if (it < target) std::rotate(it, it + 1, target + 1);
-    else std::rotate(target, it, it + 1);
+    if (it < target) std::ranges::rotate(it, it + 1, target + 1);
+    else std::ranges::rotate(target, it, it + 1);
 }
 
 // ---- The avatar -------------------------------------------------------------

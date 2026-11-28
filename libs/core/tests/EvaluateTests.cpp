@@ -1018,3 +1018,27 @@ TEST_CASE("a sweep within a millionth of a degree of a full turn is a whole turn
     EXPECT((result[round].vertices.size() == 1 && result[round].edge(circle.arc()).start == result[round].edge(circle.arc()).end), "a circle with no slice");
     EXPECT((result[ring].edge(sector.startSide()).seam && result[ring].edge(sector.endSide()).seam), "and a ring closed on itself");
 }
+
+TEST_CASE("a broken limit is said with its rule and the number that broke it")
+{
+    Document doc;
+    const PanelId narrow = doc.add(Panel{.name = "narrow"});
+    const OpRef<Rect> rect = doc.add(narrow, Rect{.width = -1234567.0, .height = 10_cm});
+    const PanelId round = doc.add(Panel{.name = "round"});
+    const OpRef<Circle> circle = doc.add(round, Circle{.radius = 10_cm, .sweep = 400.5});
+    const PanelId lined = doc.add(Panel{.name = "lined"});
+    const OpRef<Rect> base = doc.add(lined, Rect{.width = 10_cm, .height = 10_cm});
+    const OpRef<LineBetween> line = doc.add(lined, LineBetween{.from = {base.left(), 1.0 / 0.75}, .to = {base.right(), 0.5}});
+    const OpRef<AddPoint> point = doc.add(lined, AddPoint{.at = {base.top(), 1.0}});
+
+    const Result result = evaluate(doc);
+    const auto saidOf = [&](OpId operation) {
+        for (const Error& error : result.errors)
+            if (const OpId* where = std::get_if<OpId>(&error.where); where && *where == operation) return error.message;
+        return std::string();
+    };
+    CHECK(saidOf(rect) == "Width must be greater than 0; it is -1.23457e+06");
+    CHECK(saidOf(circle) == "Sweep must be greater than 0 and at most 360; it is 400.5");
+    CHECK(saidOf(line) == "From position must be at least 0 and at most 1; it is 1.33333");
+    CHECK(saidOf(point) == "Position must be greater than 0 and less than 1; it is 1");
+}

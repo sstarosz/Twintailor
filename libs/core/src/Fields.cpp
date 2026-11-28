@@ -1,12 +1,15 @@
 #include "twintailor/core/Fields.h"
 
+#include <algorithm>
+#include <array>
 #include <cmath>
-#include <cstdio>
+#include <format>
 #include <limits>
 #include <type_traits>
 
 #include "twintailor/core/Document.h"
 #include "internal/FieldAccess.h"
+#include "internal/Find.h"
 
 namespace twintailor {
 
@@ -103,25 +106,27 @@ template <class Visit> void describeReferences(SetLength& op, Visit visit) { vis
 // What each operation type calls the edges and corners it creates, in the
 // order of its Edge and Corner enums.
 std::string_view edgeRoleName(const OpData& operation, uint16_t role) {
-    static constexpr std::string_view rect[] = {"bottom edge", "right edge", "top edge", "left edge"};
-    static constexpr std::string_view ring[] = {"inner edge", "outer edge", "start side", "end side"};
-    static constexpr std::string_view circle[] = {"arc", "start side", "end side"};
-    if (std::holds_alternative<Rect>(operation) && role < 4) return rect[role];
-    if (std::holds_alternative<RingSector>(operation) && role < 4) return ring[role];
-    if (std::holds_alternative<Circle>(operation) && role < 3) return circle[role];
+    static constexpr auto rect = std::to_array<std::string_view>({"bottom edge", "right edge", "top edge", "left edge"});
+    static constexpr auto ring = std::to_array<std::string_view>({"inner edge", "outer edge", "start side", "end side"});
+    static constexpr auto circle = std::to_array<std::string_view>({"arc", "start side", "end side"});
+    if (std::holds_alternative<Rect>(operation) && role < rect.size()) return rect[role];
+    if (std::holds_alternative<RingSector>(operation) && role < ring.size()) return ring[role];
+    if (std::holds_alternative<Circle>(operation) && role < circle.size()) return circle[role];
     if (std::holds_alternative<Cut>(operation)) return "cut edge";
     return "edge";
 }
 
 std::string_view cornerRoleName(const OpData& operation, uint16_t role) {
-    static constexpr std::string_view rect[] = {"bottom-left corner", "bottom-right corner", "top-right corner", "top-left corner"};
-    static constexpr std::string_view ring[] = {"inner start corner", "inner end corner", "outer start corner", "outer end corner"};
-    static constexpr std::string_view cut[] = {"cut start corner", "cut end corner"};
-    if (std::holds_alternative<Rect>(operation) && role < 4) return rect[role];
-    if (std::holds_alternative<RingSector>(operation) && role < 4) return ring[role];
-    static constexpr std::string_view circle[] = {"start corner", "end corner", "centre"};
-    if (std::holds_alternative<Circle>(operation) && role < 3) return circle[role];
-    if (std::holds_alternative<Cut>(operation) && role < 2) return cut[role];
+    static constexpr auto rect =
+        std::to_array<std::string_view>({"bottom-left corner", "bottom-right corner", "top-right corner", "top-left corner"});
+    static constexpr auto ring =
+        std::to_array<std::string_view>({"inner start corner", "inner end corner", "outer start corner", "outer end corner"});
+    static constexpr auto circle = std::to_array<std::string_view>({"start corner", "end corner", "centre"});
+    static constexpr auto cut = std::to_array<std::string_view>({"cut start corner", "cut end corner"});
+    if (std::holds_alternative<Rect>(operation) && role < rect.size()) return rect[role];
+    if (std::holds_alternative<RingSector>(operation) && role < ring.size()) return ring[role];
+    if (std::holds_alternative<Circle>(operation) && role < circle.size()) return circle[role];
+    if (std::holds_alternative<Cut>(operation) && role < cut.size()) return cut[role];
     if (std::holds_alternative<AddPoint>(operation)) return "added point";
     return "corner";
 }
@@ -129,12 +134,8 @@ std::string_view cornerRoleName(const OpData& operation, uint16_t role) {
 // "2. Curve": the operation's place in its panel and its label.
 std::string numbered(OpId operation, const Document& doc) {
     const std::vector<OpId> siblings = doc.operations(doc.panelOf(operation));
-    std::size_t number = 1;
-    for (OpId sibling : siblings) {
-        if (sibling == operation) break;
-        ++number;
-    }
-    return std::to_string(number) + ". " + std::string(label(doc.get(operation)));
+    const auto place = std::ranges::find(siblings, operation) - siblings.begin();
+    return std::format("{}. {}", place + 1, label(doc.get(operation)));
 }
 
 std::string missing(OpId operation) { return operation == OpId{} ? "nothing chosen" : "something that was removed"; }
@@ -162,7 +163,7 @@ Limits Limits::between(double low, double high) { return {low, true, high, true}
 Limits Limits::strictlyBetween(double low, double high) { return {low, false, high, false}; }
 
 bool Limits::allows(double value) const {
-    if (!(value == value)) return false;  // not a number
+    if (std::isnan(value)) return false;
     const double slack = 1e-9;            // so that 360 computed as 359.9999999999 or 360.0000000001 still passes
     if (lowIncluded ? value < low - slack : value <= low) return false;
     if (highIncluded ? value > high + slack : value >= high) return false;
@@ -170,15 +171,10 @@ bool Limits::allows(double value) const {
 }
 
 std::string Limits::rule() const {
-    const auto number = [](double v) {
-        char text[32];
-        std::snprintf(text, sizeof text, "%g", v);
-        return std::string(text);
-    };
     const bool hasLow = std::isfinite(low), hasHigh = std::isfinite(high);
     std::string text;
-    if (hasLow) text = std::string(lowIncluded ? "must be at least " : "must be greater than ") + number(low);
-    if (hasHigh) text += std::string(hasLow ? " and " : "must be ") + (highIncluded ? "at most " : "less than ") + number(high);
+    if (hasLow) text = std::format("must be {} {:g}", lowIncluded ? "at least" : "greater than", low);
+    if (hasHigh) text += std::format("{} {} {:g}", hasLow ? " and" : "must be", highIncluded ? "at most" : "less than", high);
     return text;
 }
 
@@ -212,11 +208,7 @@ ReferenceChange setReferenceAt(OpData& operation, std::size_t index, const Refer
 
 void remapReferences(OpData& operation, const std::vector<std::pair<OpId, OpId>>& mapping) {
     const auto remap = [&](OpId& id) {
-        for (const auto& [from, to] : mapping)
-            if (from == id) {
-                id = to;
-                return;
-            }
+        if (const auto* pair = findBy(mapping, id, &std::pair<OpId, OpId>::first)) id = pair->second;
     };
     std::visit([&](auto& op) {
         describeReferences(op, [&](std::string_view, auto& slot) {
@@ -232,7 +224,7 @@ void remapReferences(OpData& operation, const std::vector<std::pair<OpId, OpId>>
 
 std::string edgeName(const EdgeRef& edge, const Document& doc) {
     if (!doc.contains(edge.op)) return {};
-    return viaWords(edge.via, doc) + std::string(edgeRoleName(doc.get(edge.op), edge.role));
+    return std::format("{}{}", viaWords(edge.via, doc), edgeRoleName(doc.get(edge.op), edge.role));
 }
 
 std::string shortName(const CornerRef& corner, const Document& doc) {
@@ -240,21 +232,21 @@ std::string shortName(const CornerRef& corner, const Document& doc) {
     std::string_view role = cornerRoleName(doc.get(corner.op), corner.role);
     constexpr std::string_view said = " corner";  // a list of corners need not say that they are
     if (role.ends_with(said)) role.remove_suffix(said.size());
-    return viaWords(corner.via, doc) + std::string(role);
+    return std::format("{}{}", viaWords(corner.via, doc), role);
 }
 
 std::string nameOf(const Reference& reference, const Document& doc) {
     if (const EdgeRef* edge = std::get_if<EdgeRef>(&reference)) {
         if (!doc.contains(edge->op)) return missing(edge->op);
-        return edgeName(*edge, doc) + " of " + numbered(edge->op, doc);
+        return std::format("{} of {}", edgeName(*edge, doc), numbered(edge->op, doc));
     }
     if (const CornerRef* corner = std::get_if<CornerRef>(&reference)) {
         if (!doc.contains(corner->op)) return missing(corner->op);
-        return viaWords(corner->via, doc) + std::string(cornerRoleName(doc.get(corner->op), corner->role)) + " of " + numbered(corner->op, doc);
+        return std::format("{}{} of {}", viaWords(corner->via, doc), cornerRoleName(doc.get(corner->op), corner->role), numbered(corner->op, doc));
     }
     if (const LineRef* line = std::get_if<LineRef>(&reference)) {
         if (!doc.contains(line->op)) return missing(line->op);
-        return "line of " + numbered(line->op, doc);
+        return std::format("line of {}", numbered(line->op, doc));
     }
     const PanelId panel = std::get<PanelId>(reference);
     if (!doc.contains(panel)) return panel == PanelId{} ? "nothing chosen" : "a panel that was removed";

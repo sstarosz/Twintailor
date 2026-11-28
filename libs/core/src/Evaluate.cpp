@@ -2,8 +2,8 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstdio>
 #include <expected>
+#include <format>
 #include <optional>
 #include <stdexcept>
 #include <utility>
@@ -11,6 +11,7 @@
 #include "twintailor/core/Drawing.h"
 #include "twintailor/core/Fields.h"
 #include "internal/ExprNode.h"
+#include "internal/Find.h"
 #include "internal/Outline.h"
 
 namespace twintailor {
@@ -59,8 +60,7 @@ public:
     Pattern before(OpId operation) {
         const PanelId panel = doc_.panelOf(operation);
         // Marked as being built, so that a panel that leads back to itself is found.
-        for (PanelState& s : panels_)
-            if (s.panel == panel) s.state = State::Running;
+        findBy(panels_, panel, &PanelState::panel)->state = State::Running;
         return build(panel, operation);
     }
 
@@ -89,9 +89,8 @@ public:
 
 private:
     const Pattern* shapeOf(PanelId panel) const {
-        for (const PanelResult& p : result_.panels)
-            if (p.panel == panel) return &p.pattern;
-        return nullptr;
+        const PanelResult* built = findBy(result_.panels, panel, &PanelResult::panel);
+        return built ? &built->pattern : nullptr;
     }
 
     enum class State { Pending, Running, Done, Failed };
@@ -114,20 +113,14 @@ private:
 
     // ---- Parameters ----
 
-    ParameterState* find(Param p) {
-        for (ParameterState& s : parameters_)
-            if (s.parameter == p) return &s;
-        return nullptr;
-    }
-
     Value valueOf(Param p) {
-        ParameterState* s = find(p);
+        ParameterState* s = findBy(parameters_, p, &ParameterState::parameter);
         if (!s) return fail("refers to a parameter that no longer exists");
         const std::string& name = doc_.get(p).name;
         switch (s->state) {
         case State::Done: return s->value;
-        case State::Failed: return fail("depends on '" + name + "', which has an error");
-        case State::Running: return fail("circular reference through '" + name + "'");
+        case State::Failed: return failedThrough(name);
+        case State::Running: return fail(std::format("circular reference through '{}'", name));
         case State::Pending: break;
         }
         s->state = State::Running;
@@ -139,8 +132,10 @@ private:
         }
         s->state = State::Failed;
         result_.errors.push_back({p, v.error()});
-        return fail("depends on '" + name + "', which has an error");
+        return failedThrough(name);
     }
+
+    static Value failedThrough(const std::string& name) { return fail(std::format("depends on '{}', which has an error", name)); }
 
     // ---- Expressions ----
 
@@ -157,12 +152,10 @@ private:
         for (const Field& field : fields(data)) {
             const Value v = eval(field.value);
             if (!v) {
-                error(op, std::string(field.label) + " " + v.error());
+                error(op, std::format("{} {}", field.label, v.error()));
                 usable = false;
             } else if (!field.limits.allows(*v)) {
-                char got[32];
-                std::snprintf(got, sizeof got, "%g", *v);
-                error(op, std::string(field.label) + " " + field.limits.rule() + "; it is " + got);
+                error(op, std::format("{} {}; it is {:g}", field.label, field.limits.rule(), *v));
                 usable = false;
             } else {
                 values.push_back(*v);
@@ -178,9 +171,7 @@ private:
     // instance can ask for its source; the reason instead when the panel is
     // gone or the request loops back on itself.
     std::expected<const Pattern*, std::string> patternOf(PanelId panel) {
-        PanelState* s = nullptr;
-        for (PanelState& candidate : panels_)
-            if (candidate.panel == panel) s = &candidate;
+        PanelState* s = findBy(panels_, panel, &PanelState::panel);
         if (!s) return std::unexpected("the source panel no longer exists");
         if (s->state == State::Running) return std::unexpected("the panel is an instance of itself, directly or through other panels");
         if (s->state == State::Pending) {
@@ -226,14 +217,14 @@ private:
 
     // Starting operations create the outline, so they must come first.
     bool starts(bool first, const char* what, OpId op) {
-        if (!first) error(op, std::string(what) + " must be the first operation of its panel");
+        if (!first) error(op, std::format("{} must be the first operation of its panel", what));
         return first;
     }
 
     // Modifying operations need an outline. If the starting operation failed
     // there is none, and that failure is already reported.
     bool modifies(bool first, const char* what, OpId op, const Pattern& pattern) {
-        if (first) error(op, std::string(what) + " needs an outline: add a starting operation before it");
+        if (first) error(op, std::format("{} needs an outline: add a starting operation before it", what));
         return !first && !pattern.edges.empty();
     }
 
@@ -241,10 +232,9 @@ private:
     // of that name: nullptr, and `what` is reported as not there.
     template <class Item, class Name>
     Item* named(std::vector<Item>& items, const Name& name, OpId op, const char* what) {
-        for (Item& item : items)
-            if (item.name == name) return &item;
-        error(op, std::string(what) + " does not exist; an earlier operation may have removed it");
-        return nullptr;
+        Item* found = findBy(items, name, &Item::name);
+        if (!found) error(op, std::format("{} does not exist; an earlier operation may have removed it", what));
+        return found;
     }
 
     // Makes `change` on a copy of the outline and keeps the copy only if all of
@@ -317,8 +307,8 @@ private:
         // Hangs downward: centred on the negative y axis.
         const double startAngle = -pi / 2.0 - angle / 2.0;
         const double endAngle = -pi / 2.0 + angle / 2.0;
-        const auto at = [](double radius, double angle) {
-            return Vec2{radius * std::cos(angle), radius * std::sin(angle)};
+        const auto at = [](double radius, double towards) {
+            return Vec2{radius * std::cos(towards), radius * std::sin(towards)};
         };
 
         const OpRef<RingSector> names(op);
@@ -450,7 +440,7 @@ private:
         if (!modifies(first, "a point adjustment", op, pattern)) return;
         const Vertex* corner = named(pattern.vertices, adjust.corner, op, "the corner to adjust");
         if (!corner) return;
-        const std::size_t vertex = static_cast<std::size_t>(corner - pattern.vertices.data());
+        const auto vertex = static_cast<std::size_t>(corner - pattern.vertices.data());
         attempt(pattern, op, [&](Pattern& changed) { return outline::moveCorners(changed, {{vertex, {value[0], value[1]}}}); });
     }
 
@@ -542,41 +532,28 @@ private:
 } // namespace
 
 const SeamResult& Result::operator[](SeamId seam) const {
-    for (const SeamResult& s : seams)
-        if (s.seam == seam) return s;
-    throw std::out_of_range("twintailor::Result: unknown seam");
+    return orThrow(findBy(seams, seam, &SeamResult::seam), "twintailor::Result: unknown seam");
 }
 
 bool Result::failed(Param parameter) const {
-    return std::any_of(errors.begin(), errors.end(), [&](const Error& e) {
-        const Param* p = std::get_if<Param>(&e.where);
-        return p && *p == parameter;
-    });
+    return std::ranges::contains(errors, decltype(Error::where)(parameter), &Error::where);
 }
 
 bool Result::failed(OpId operation) const {
-    return std::any_of(errors.begin(), errors.end(), [&](const Error& e) {
-        const OpId* o = std::get_if<OpId>(&e.where);
-        return o && *o == operation;
-    });
+    return std::ranges::contains(errors, decltype(Error::where)(operation), &Error::where);
 }
 
 double Result::operator[](Param parameter) const {
-    for (const ParameterValue& v : values)
-        if (v.parameter == parameter) return v.value;
-    throw std::out_of_range("twintailor::Result: parameter has no value");
+    return orThrow(findBy(values, parameter, &ParameterValue::parameter), "twintailor::Result: parameter has no value").value;
 }
 
 const Pattern& Result::operator[](PanelId panel) const {
-    for (const PanelResult& p : panels)
-        if (p.panel == panel) return p.pattern;
-    throw std::out_of_range("twintailor::Result: unknown panel");
+    return orThrow(findBy(panels, panel, &PanelResult::panel), "twintailor::Result: unknown panel").pattern;
 }
 
 std::optional<double> valueOf(const Expr& expr, const Result& result) {
     const Value value = compute(ExprAccess::node(expr), [&](Param parameter) -> Value {
-        for (const ParameterValue& v : result.values)
-            if (v.parameter == parameter) return v.value;
+        if (const ParameterValue* v = findBy(result.values, parameter, &ParameterValue::parameter)) return v->value;
         return fail("refers to a parameter that has no value");
     });
     return value ? std::optional<double>(*value) : std::nullopt;
@@ -618,7 +595,7 @@ Result evaluate(const Document& doc) {
         return Evaluator(doc).run();
     } catch (const std::exception& e) {
         Result failed;
-        failed.errors.push_back({Param{}, std::string("internal error: ") + e.what()});
+        failed.errors.push_back({Param{}, std::format("internal error: {}", e.what())});
         return failed;
     }
 }

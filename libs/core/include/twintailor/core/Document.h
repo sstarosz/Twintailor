@@ -166,7 +166,7 @@ public:
     // `reference` comes from references(doc.get(operation)). Throws
     // std::invalid_argument if `value` is the wrong kind of thing for it,
     // such as a corner where an edge is needed.
-    void set(OpId operation, ReferenceId reference, Reference value);
+    void set(OpId operation, ReferenceId reference, const Reference& value);
     void remove(OpId operation);
     // Switches an operation off or on. One that is off stays in the list but
     // is skipped when the panel is built.

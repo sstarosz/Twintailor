@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <ranges>
 
 #include "internal/Outline.h"
 
@@ -45,14 +46,9 @@ Vec2 midpoint(const Pattern& pattern, const Edge& edge) { return outline::pointA
 std::optional<Bounds> bounds(const Pattern& pattern) {
     const std::vector<Vec2> points = outlinePoints(pattern);
     if (points.empty()) return std::nullopt;
-    Bounds box{points.front(), points.front()};
-    for (const Vec2& p : points) {
-        box.min.x = std::min(box.min.x, p.x);
-        box.min.y = std::min(box.min.y, p.y);
-        box.max.x = std::max(box.max.x, p.x);
-        box.max.y = std::max(box.max.y, p.y);
-    }
-    return box;
+    const auto [left, right] = std::ranges::minmax(points | std::views::transform(&Vec2::x));
+    const auto [bottom, top] = std::ranges::minmax(points | std::views::transform(&Vec2::y));
+    return Bounds{{left, bottom}, {right, top}};
 }
 
 std::optional<OutlinePoint> nearestOnOutline(const Pattern& pattern, Vec2 point) {

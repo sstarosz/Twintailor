@@ -615,3 +615,79 @@ TEST_CASE("every other operation saved by 0.1 opens, with the same lengths")
     EXPECT((left.drape->panels.back().panel == twin && left.drape->panels.back().at.size() == 4 && left.drape->panels.back().triangles.size() == 2),
            "and the next one's");
 }
+
+TEST_CASE("a file is written to the letter")
+{
+    Document doc;
+    const Param waist = doc.add(Parameter{.name = "waist \"w\"", .value = 70.1});
+    const Param share = doc.add(Parameter{.name = "share", .value = min(max(-Expr(waist), 1e-7), abs(Expr(waist) / 3)) * 100000.0 - 1e20, .unit = Unit::Fraction});
+    const PanelId half = doc.add(Panel{.name = "half", .x = 100000, .y = -1.0 / 3.0, .angle = -0.0, .particleDistance = 1.5});
+    doc.arrange(half, Arrangement{.placed = true, .x = 0.1, .y = 100, .z = 1e21, .turn = 90, .tilt = -5, .roll = 180, .wrap = 60, .anchor = Vec2{7.5, 2.0 / 3.0}});
+    const OpRef<Rect> rect = doc.add(half, Rect{.width = waist + share, .height = 60});
+    const OpRef<LineBetween> line = doc.add(half, LineBetween{.from = {rect.left(), 0.5}, .to = {rect.right(), 0.25}});
+    const OpRef<Cut> cut = doc.add(half, Cut{.along = line.line(), .keep = Cut::Side::Right});
+    const OpRef<Mirror> mirror = doc.add(half, Mirror{.across = cut.farPart(rect.left()), .appliedLast = false});
+    const OpRef<AdjustPoint> adjust = doc.add(half, AdjustPoint{.corner = mirror.image(rect.bottomLeft()), .dx = 1, .dy = 2});
+    doc.setEnabled(adjust, false);
+    doc.add(half, SetLength{.edge = EdgeRef{}, .length = 5, .keeping = SetLength::Keeping::End});
+    const PanelId twin = doc.add(Panel{.name = "twin", .construction = true});
+    doc.add(twin, Instance{.source = half, .mirrored = true});
+    const PanelId rest = doc.add(Panel{.name = "rest"});
+    doc.add(rest, Offcut{.of = cut});
+    const SeamId seam = doc.add(Seam{.a = {half, mirror.image(rect.top())}, .b = {twin, rect.bottom()}, .reversed = true});
+    doc.setAvatar(std::make_shared<const Avatar>(Avatar{.name = "me.obj",
+                                                        .points = {{0, 0, 0}, {100000, 1.0 / 7.0, -1e-9}, {0.1, 1e21, -0.0}},
+                                                        .triangles = {{0, 1, 2}},
+                                                        .readAs = {.unit = 2.54, .rescale = 1.0 / 3.0, .up = Axis::Z, .facing = Axis::MinusY, .moved = {1, -2.5, 100000}}}));
+    const SceneState state{.frozen = {twin},
+                           .hidden = {rest},
+                           .hiddenSeams = {seam},
+                           .bodyHidden = true,
+                           .bodySeeThrough = true,
+                           .drape = SavedDrape{.time = 2.0 / 3.0,
+                                               .sewing = true,
+                                               .panels = {{.panel = half,
+                                                           .anchor = {15, 1.0 / 3.0},
+                                                           .flat = {{0, 0}, {100000, 0}, {0, 40}},
+                                                           .at = {{-1.0 / 7.0, 100, 2}, {29, 99.5, 2}, {0, 140, -1e-9}},
+                                                           .triangles = {{0, 1, 2}}}}}};
+
+    const std::string written = toText(doc, state);
+    const std::string expected = R"(twintailor 1
+next 15
+parameter 1 "waist \"w\"" n 70.099999999999994
+parameter 2 "share" - * min max neg p 1 n 9.9999999999999995e-08 abs / p 1 n 3 n 100000 n 1e+20 unit fraction
+panel 3 "half" 0 100000 -0.33333333333333331 -0 1.5
+arrange 0.10000000000000001 100 1e+21 90 -5 180 60 7.5 0.66666666666666663
+op 4 Rect 1 2 + p 1 p 2 n 60 0 0
+op 5 LineBetween 1 2 n 0.5 n 0.25 2 e 4 3 0 e 4 1 0 0
+op 6 Cut 1 0 1 l 5 1 1
+op 7 Mirror 1 0 1 e 4 3 1 6 1 0
+op 8 AdjustPoint 0 2 n 1 n 2 1 c 4 0 1 7 0
+op 9 SetLength 1 1 n 5 1 e 0 0 0 1 2
+panel 10 "twin" 1 0 0 0
+op 11 Instance 1 0 1 P 3 1 1
+panel 12 "rest" 0 0 0 0
+op 13 Offcut 1 0 0 1 6
+seam 14 3 e 4 2 1 7 10 e 4 0 0 1
+frozen 10
+hidden 12
+hiddenseam 14
+body hidden
+body seethrough
+drape 0.6666666666666666 1 1
+cloth 3 15 0.3333333333333333 3 1
+d 0 0 -0.14285714285714285 100 2
+d 1e+05 0 29 99.5 2
+d 0 40 0 140 -1e-09
+f 0 1 2
+avatar "me.obj" 3 1
+import 2.54 0.3333333333333333 z -y 1 -2.5 1e+05
+v 0 0 0
+v 1e+05 0.14285714285714285 -1e-09
+v 0.1 1e+21 -0
+t 0 1 2
+)";
+    INFO(written);
+    CHECK(written == expected);
+}

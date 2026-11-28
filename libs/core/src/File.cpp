@@ -2,21 +2,23 @@
 
 #include <algorithm>
 #include <array>
-#include <charconv>
 #include <chrono>
 #include <cmath>
-#include <cstdio>
+#include <format>
 #include <fstream>
+#include <iterator>
 #include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <system_error>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #include "internal/DocumentAccess.h"
 #include "internal/ExprNode.h"
 #include "internal/FieldAccess.h"
+#include "internal/ReadNumber.h"
 
 namespace twintailor {
 
@@ -33,10 +35,10 @@ constexpr std::array<std::string_view, std::variant_size_v<OpData>> typeNames = 
 };
 // Units by their names in a file, in Unit's order; never renamed once released.
 constexpr std::array<std::string_view, 4> unitNames = {"length", "angle", "fraction", "none"};
-static_assert(static_cast<std::size_t>(Unit::None) == 3);
+static_assert(std::to_underlying(Unit::None) == 3);
 // Axes by their names in a file, in Axis's order; never renamed once released.
 constexpr std::array<std::string_view, 6> axisNames = {"x", "y", "z", "-x", "-y", "-z"};
-static_assert(static_cast<std::size_t>(Axis::MinusZ) == 5);
+static_assert(std::to_underlying(Axis::MinusZ) == 5);
 
 static_assert(std::is_same_v<std::variant_alternative_t<0, OpData>, Rect>);
 static_assert(std::is_same_v<std::variant_alternative_t<4, OpData>, Offcut>);
@@ -52,34 +54,23 @@ std::optional<OpData> emptyOperation(std::size_t index, std::index_sequence<I...
     ((index == I ? (made.emplace(std::in_place_index<I>), true) : false) || ...);
     return made;
 }
-std::optional<OpData> emptyOperation(std::string_view name) {
-    for (std::size_t i = 0; i < typeNames.size(); ++i)
-        if (typeNames[i] == name) return emptyOperation(i, std::make_index_sequence<std::variant_size_v<OpData>>{});
-    return std::nullopt;
+// Where `name` is among `names`: which type, unit or axis a file means by it.
+template <std::size_t N>
+std::optional<std::size_t> placeOf(const std::array<std::string_view, N>& names, std::string_view name) {
+    const auto found = std::ranges::find(names, name);
+    if (found == names.end()) return std::nullopt;
+    return static_cast<std::size_t>(found - names.begin());
 }
 
 // ---- Writing ----
 
-std::string number(double value) {
-    char text[40];
-    std::snprintf(text, sizeof text, "%.17g", value);
-    return text;
+// Appends to `out`, as std::format writes it. {} gives a number as the shortest
+// text that reads back as the same one, which an avatar's many thousands use;
+// the pattern's own numbers are written to 17 digits, {:.17g}.
+template <class... Values>
+void add(std::string& out, std::format_string<Values...> format, Values&&... values) {
+    std::format_to(std::back_inserter(out), format, std::forward<Values>(values)...);
 }
-
-// The shortest text that reads back as the same number: an avatar has tens of
-// thousands of them.
-std::string shortest(double value) {
-    char text[32];
-    const auto [end, error] = std::to_chars(text, text + sizeof text, value);
-    return std::string(text, end);
-}
-
-// A point as its numbers, a space between each.
-std::string shortest(Vec2 p) { return shortest(p.x) + " " + shortest(p.y); }
-std::string shortest(const Vec3& p) { return shortest(p.x) + " " + shortest(p.y) + " " + shortest(p.z); }
-
-// The three particles or points of a triangle.
-std::string corners(const std::array<uint32_t, 3>& t) { return std::to_string(t[0]) + " " + std::to_string(t[1]) + " " + std::to_string(t[2]); }
 
 std::string quoted(const std::string& text) {
     std::string out = "\"";
@@ -94,8 +85,8 @@ std::string quoted(const std::string& text) {
 // A formula in prefix form: "+ p 3 n 1.5" is parameter 3 plus 1.5.
 void write(std::string& out, const ExprNode& node) {
     switch (node.kind) {
-    case Kind::Number: out += " n " + number(node.number); return;
-    case Kind::Parameter: out += " p " + std::to_string(node.parameter.value); return;
+    case Kind::Number: add(out, " n {:.17g}", node.number); return;
+    case Kind::Parameter: add(out, " p {}", node.parameter.value); return;
     case Kind::Add: out += " +"; break;
     case Kind::Subtract: out += " -"; break;
     case Kind::Multiply: out += " *"; break;
@@ -111,23 +102,23 @@ void write(std::string& out, const ExprNode& node) {
 void write(std::string& out, const Expr& expr) { write(out, ExprAccess::node(expr)); }
 
 void writeVia(std::string& out, const std::vector<OpId>& via) {
-    out += " " + std::to_string(via.size());
-    for (OpId op : via) out += " " + std::to_string(op.value);
+    add(out, " {}", via.size());
+    for (OpId op : via) add(out, " {}", op.value);
 }
 void write(std::string& out, const EdgeRef& edge) {
-    out += " e " + std::to_string(edge.op.value) + " " + std::to_string(edge.role);
+    add(out, " e {} {}", edge.op.value, edge.role);
     writeVia(out, edge.via);
 }
 void write(std::string& out, const Reference& reference) {
     if (const EdgeRef* edge = std::get_if<EdgeRef>(&reference)) {
         write(out, *edge);
     } else if (const CornerRef* corner = std::get_if<CornerRef>(&reference)) {
-        out += " c " + std::to_string(corner->op.value) + " " + std::to_string(corner->role);
+        add(out, " c {} {}", corner->op.value, corner->role);
         writeVia(out, corner->via);
     } else if (const LineRef* line = std::get_if<LineRef>(&reference)) {
-        out += " l " + std::to_string(line->op.value);
+        add(out, " l {}", line->op.value);
     } else {
-        out += " P " + std::to_string(std::get<PanelId>(reference).value);
+        add(out, " P {}", std::get<PanelId>(reference).value);
     }
 }
 
@@ -159,12 +150,6 @@ bool setExtras(OpData& data, const std::vector<long long>& values) {
 struct Problem {
     std::string message;
 };
-
-std::string shown(double value) {
-    char text[32];
-    std::snprintf(text, sizeof text, "%g", value);
-    return text;
-}
 
 // One line's words. A quoted word may hold spaces.
 class Words {
@@ -199,10 +184,8 @@ public:
     }
     long long whole() {
         const std::string text = word();
-        long long value = 0;
-        const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value);
-        if (error != std::errc{} || end != text.data() + text.size()) throw Problem{"\"" + text + "\" should be a whole number"};
-        return value;
+        if (const std::optional<long long> value = readNumber<long long>(text)) return *value;
+        throw Problem{std::format("\"{}\" should be a whole number", text)};
     }
     uint32_t id() { return idFrom(1, "an id is out of range"); }
     // The id a reference names: 0 while nothing is chosen.
@@ -215,13 +198,8 @@ public:
     // A number: every one in a file is a real one, so "nan" and "inf" are not.
     double real() {
         const std::string text = word();
-        try {
-            std::size_t used = 0;
-            const double value = std::stod(text, &used);
-            if (used == text.size() && std::isfinite(value)) return value;
-        } catch (const std::exception&) {
-        }
-        throw Problem{"\"" + text + "\" should be a number"};
+        if (const std::optional<double> value = readNumber<double>(text); value && std::isfinite(*value)) return *value;
+        throw Problem{std::format("\"{}\" should be a number", text)};
     }
     // Points, as their numbers in turn. (Braces read them in the order written.)
     Vec2 vec2() { return {real(), real()}; }
@@ -230,7 +208,7 @@ public:
     double particleDistance() {
         const double value = real();
         if (value < finestParticleDistance || value > coarsestParticleDistance)
-            throw Problem{"the particle distance must be between " + shown(finestParticleDistance) + " and " + shown(coarsestParticleDistance) + " cm"};
+            throw Problem{std::format("the particle distance must be between {:g} and {:g} cm", finestParticleDistance, coarsestParticleDistance)};
         return value;
     }
 
@@ -263,7 +241,7 @@ Expr readExpr(Words& words, int depth = 0) {
     if (head == "/") return a / b;
     if (head == "min") return min(a, b);
     if (head == "max") return max(a, b);
-    throw Problem{"\"" + head + "\" is not part of a formula"};
+    throw Problem{std::format("\"{}\" is not part of a formula", head)};
 }
 
 std::vector<OpId> readVia(Words& words) {
@@ -283,7 +261,7 @@ Reference readReference(Words& words) {
     }
     if (kind == "l") return LineRef{OpId{target}};
     if (kind == "P") return PanelId{target};
-    throw Problem{"\"" + kind + "\" is not a kind of reference"};
+    throw Problem{std::format("\"{}\" is not a kind of reference", kind)};
 }
 EdgeRef readEdge(Words& words) {
     const Reference reference = readReference(words);
@@ -301,12 +279,12 @@ constexpr long long mostOfAnAvatar = 10'000'000;  // points, or triangles
 // follow, how its file was read (only if not as it was), then a line for each
 // point and triangle.
 void write(std::string& out, const Avatar& avatar) {
-    out += "avatar " + quoted(avatar.name) + " " + std::to_string(avatar.points.size()) + " " + std::to_string(avatar.triangles.size()) + "\n";
+    add(out, "avatar {} {} {}\n", quoted(avatar.name), avatar.points.size(), avatar.triangles.size());
     if (const AvatarImport& as = avatar.readAs; as != AvatarImport{})
-        out += "import " + shortest(as.unit) + " " + shortest(as.rescale) + " " + std::string(axisNames[static_cast<std::size_t>(as.up)]) + " " +
-               std::string(axisNames[static_cast<std::size_t>(as.facing)]) + " " + shortest(as.moved) + "\n";
-    for (const Vec3& p : avatar.points) out += "v " + shortest(p) + "\n";
-    for (const std::array<uint32_t, 3>& t : avatar.triangles) out += "t " + corners(t) + "\n";
+        add(out, "import {} {} {} {} {} {} {}\n", as.unit, as.rescale, axisNames[std::to_underlying(as.up)],
+            axisNames[std::to_underlying(as.facing)], as.moved.x, as.moved.y, as.moved.z);
+    for (const Vec3& p : avatar.points) add(out, "v {} {} {}\n", p.x, p.y, p.z);
+    for (const auto& [a, b, c] : avatar.triangles) add(out, "t {} {} {}\n", a, b, c);
 }
 
 // An avatar as far as it has been read.
@@ -321,27 +299,26 @@ struct ReadingAvatar {
 // drape: how many panels' cloth follows, and for each its anchor, how many
 // particles (flat u v, space x y z) and triangles, then a line for each.
 void write(std::string& out, const SceneState& state) {
-    for (PanelId panel : state.frozen) out += "frozen " + std::to_string(panel.value) + "\n";
-    for (PanelId panel : state.hidden) out += "hidden " + std::to_string(panel.value) + "\n";
-    for (SeamId seam : state.hiddenSeams) out += "hiddenseam " + std::to_string(seam.value) + "\n";
+    for (PanelId panel : state.frozen) add(out, "frozen {}\n", panel.value);
+    for (PanelId panel : state.hidden) add(out, "hidden {}\n", panel.value);
+    for (SeamId seam : state.hiddenSeams) add(out, "hiddenseam {}\n", seam.value);
     if (state.bodyHidden) out += "body hidden\n";
     if (state.bodySeeThrough) out += "body seethrough\n";
     if (!state.drape) return;
-    out += "drape " + shortest(state.drape->time) + " " + (state.drape->sewing ? "1" : "0") + " " + std::to_string(state.drape->panels.size()) + "\n";
+    add(out, "drape {} {:d} {}\n", state.drape->time, state.drape->sewing, state.drape->panels.size());
     for (const DrapedPanel& cloth : state.drape->panels) {
         const std::size_t particles = std::min(cloth.flat.size(), cloth.at.size());
-        out += "cloth " + std::to_string(cloth.panel.value) + " " + shortest(cloth.anchor) + " " + std::to_string(particles) + " " +
-               std::to_string(cloth.triangles.size()) + "\n";
-        for (std::size_t i = 0; i < particles; ++i) out += "d " + shortest(cloth.flat[i]) + " " + shortest(cloth.at[i]) + "\n";
-        for (const std::array<uint32_t, 3>& t : cloth.triangles) out += "f " + corners(t) + "\n";
+        add(out, "cloth {} {} {} {} {}\n", cloth.panel.value, cloth.anchor.x, cloth.anchor.y, particles, cloth.triangles.size());
+        for (std::size_t i = 0; i < particles; ++i)
+            add(out, "d {} {} {} {} {}\n", cloth.flat[i].x, cloth.flat[i].y, cloth.at[i].x, cloth.at[i].y, cloth.at[i].z);
+        for (const auto& [a, b, c] : cloth.triangles) add(out, "f {} {} {}\n", a, b, c);
     }
 }
 
 Axis readAxis(Words& words) {
     const std::string name = words.word();
-    const auto known = std::find(axisNames.begin(), axisNames.end(), name);
-    if (known == axisNames.end()) throw Problem{"\"" + name + "\" is not an axis"};
-    return static_cast<Axis>(known - axisNames.begin());
+    if (const std::optional<std::size_t> place = placeOf(axisNames, name)) return static_cast<Axis>(*place);
+    throw Problem{std::format("\"{}\" is not an axis", name)};
 }
 
 // What follows "import": the unit and the rescale, the axes that became y and
@@ -361,10 +338,10 @@ AvatarImport readImport(Words& words) {
 
 // Three of the first `count` particles or points.
 std::array<uint32_t, 3> readTriangle(Words& words, std::size_t count, const char* otherwise) {
-    std::array<uint32_t, 3> triangle;
+    std::array<uint32_t, 3> triangle{};
     for (uint32_t& corner : triangle) {
         const long long point = words.whole();
-        if (point < 0 || point >= static_cast<long long>(count)) throw Problem{otherwise};
+        if (point < 0 || std::cmp_greater_equal(point, count)) throw Problem{otherwise};
         corner = static_cast<uint32_t>(point);
     }
     return triangle;
@@ -388,46 +365,47 @@ struct ReadingDrape {
 std::filesystem::path filePath(std::string_view utf8) { return std::filesystem::path(std::u8string(utf8.begin(), utf8.end())); }
 
 std::string toText(const Document& doc, const SceneState& state) {
-    std::string out = std::string(firstLine) + "\n";
-    out += "next " + std::to_string(DocumentAccess::nextId(doc)) + "\n";
+    std::string out = std::format("{}\nnext {}\n", firstLine, DocumentAccess::nextId(doc));
     for (Param id : doc.parameters()) {
         const Parameter& parameter = doc.get(id);
-        out += "parameter " + std::to_string(id.value) + " " + quoted(parameter.name);
+        add(out, "parameter {} {}", id.value, quoted(parameter.name));
         write(out, parameter.value);
         // A length says nothing, as in files before 0.1.1.
-        if (parameter.unit != Unit::Length) out += " unit " + std::string(unitNames[static_cast<std::size_t>(parameter.unit)]);
-        out += "\n";
+        if (parameter.unit != Unit::Length) add(out, " unit {}", unitNames[std::to_underlying(parameter.unit)]);
+        out += '\n';
     }
     for (PanelId id : doc.panels()) {
         const Panel& panel = doc.get(id);
-        out += "panel " + std::to_string(id.value) + " " + quoted(panel.name) + " " + (panel.construction ? "1" : "0") + " " +
-               number(panel.x) + " " + number(panel.y) + " " + number(panel.angle) +
-               (panel.particleDistance ? " " + number(*panel.particleDistance) : std::string()) + "\n";
-        if (const Arrangement& in = panel.arrangement; in.placed)
-            out += "arrange " + number(in.x) + " " + number(in.y) + " " + number(in.z) + " " + number(in.turn) + " " + number(in.tilt) + " " +
-                   number(in.roll) + " " + number(in.wrap) + (in.anchor ? " " + number(in.anchor->x) + " " + number(in.anchor->y) : std::string()) + "\n";
+        add(out, "panel {} {} {:d} {:.17g} {:.17g} {:.17g}", id.value, quoted(panel.name), panel.construction, panel.x, panel.y, panel.angle);
+        if (panel.particleDistance) add(out, " {:.17g}", *panel.particleDistance);
+        out += '\n';
+        if (const Arrangement& in = panel.arrangement; in.placed) {
+            add(out, "arrange {:.17g} {:.17g} {:.17g} {:.17g} {:.17g} {:.17g} {:.17g}", in.x, in.y, in.z, in.turn, in.tilt, in.roll, in.wrap);
+            if (in.anchor) add(out, " {:.17g} {:.17g}", in.anchor->x, in.anchor->y);
+            out += '\n';
+        }
         for (OpId op : doc.operations(id)) {
             const OpData& data = doc.get(op);
-            out += "op " + std::to_string(op.value) + " " + std::string(typeNames[data.index()]) + " " + (doc.enabled(op) ? "1" : "0");
+            add(out, "op {} {} {:d}", op.value, typeNames[data.index()], doc.enabled(op));
             const std::vector<Field> formulas = fields(data);
-            out += " " + std::to_string(formulas.size());
+            add(out, " {}", formulas.size());
             for (const Field& field : formulas) write(out, field.value);
             const std::vector<ReferenceField> slots = references(data);
-            out += " " + std::to_string(slots.size());
+            add(out, " {}", slots.size());
             for (const ReferenceField& slot : slots) write(out, slot.value);
             const std::vector<long long> more = extras(data);
-            out += " " + std::to_string(more.size());
-            for (long long value : more) out += " " + std::to_string(value);
-            out += "\n";
+            add(out, " {}", more.size());
+            for (long long value : more) add(out, " {}", value);
+            out += '\n';
         }
     }
     for (SeamId id : doc.seams()) {
         const Seam& seam = doc.get(id);
-        out += "seam " + std::to_string(id.value) + " " + std::to_string(seam.a.panel.value);
+        add(out, "seam {} {}", id.value, seam.a.panel.value);
         write(out, seam.a.edge);
-        out += " " + std::to_string(seam.b.panel.value);
+        add(out, " {}", seam.b.panel.value);
         write(out, seam.b.edge);
-        out += std::string(" ") + (seam.reversed ? "1" : "0") + "\n";
+        add(out, " {:d}\n", seam.reversed);
     }
     write(out, state);
     if (doc.avatar()) write(out, *doc.avatar());
@@ -440,7 +418,7 @@ std::variant<SavedScene, FileError> fromText(std::string_view text) {
     ReadingDrape drape;
     std::vector<uint32_t> seen;
     const auto fresh = [&](uint32_t id) {
-        if (std::find(seen.begin(), seen.end(), id) != seen.end()) throw Problem{"the id " + std::to_string(id) + " is used twice"};
+        if (std::ranges::contains(seen, id)) throw Problem{std::format("the id {} is used twice", id)};
         seen.push_back(id);
         return id;
     };
@@ -479,9 +457,9 @@ std::variant<SavedScene, FileError> fromText(std::string_view text) {
                 if (!words.done()) {
                     if (words.word() != "unit") throw Problem{"a parameter has something after its value that is not its unit"};
                     const std::string unit = words.word();
-                    const auto known = std::find(unitNames.begin(), unitNames.end(), unit);
-                    if (known == unitNames.end()) throw Problem{"\"" + unit + "\" is not a unit this version knows"};
-                    parameter.unit = static_cast<Unit>(known - unitNames.begin());
+                    const std::optional<std::size_t> place = placeOf(unitNames, unit);
+                    if (!place) throw Problem{std::format("\"{}\" is not a unit this version knows", unit)};
+                    parameter.unit = static_cast<Unit>(*place);
                 }
                 DocumentAccess::restore(doc, id, std::move(parameter));
             } else if (what == "panel") {
@@ -512,20 +490,21 @@ std::variant<SavedScene, FileError> fromText(std::string_view text) {
                 if (!panel) throw Problem{"an operation comes before any panel"};
                 const OpId id{fresh(words.id())};
                 const std::string type = words.word();
-                std::optional<OpData> data = emptyOperation(type);
-                if (!data) throw Problem{"\"" + type + "\" is not a kind of operation this version knows"};
+                const std::optional<std::size_t> kind = placeOf(typeNames, type);
+                if (!kind) throw Problem{std::format("\"{}\" is not a kind of operation this version knows", type)};
+                std::optional<OpData> data = emptyOperation(*kind, std::make_index_sequence<std::variant_size_v<OpData>>{});
                 const bool enabled = words.whole() != 0;
                 const std::size_t formulas = words.count();
-                if (formulas != fields(*data).size()) throw Problem{"a " + type + " has a different number of values"};
+                if (formulas != fields(*data).size()) throw Problem{std::format("a {} has a different number of values", type)};
                 for (std::size_t i = 0; i < formulas; ++i) *fieldAt(*data, i) = readExpr(words);
                 const std::size_t slots = words.count();
-                if (slots != references(*data).size()) throw Problem{"a " + type + " has a different number of references"};
+                if (slots != references(*data).size()) throw Problem{std::format("a {} has a different number of references", type)};
                 for (std::size_t i = 0; i < slots; ++i)
                     if (setReferenceAt(*data, i, readReference(words)) != ReferenceChange::Done)
-                        throw Problem{"a reference of this " + type + " is of the wrong kind"};
+                        throw Problem{std::format("a reference of this {} is of the wrong kind", type)};
                 std::vector<long long> more(words.count());
                 for (long long& value : more) value = words.whole();
-                if (!setExtras(*data, more)) throw Problem{"a " + type + " has a different number of settings, or one that is not allowed"};
+                if (!setExtras(*data, more)) throw Problem{std::format("a {} has a different number of settings, or one that is not allowed", type)};
                 DocumentAccess::restore(doc, *panel, id, std::move(*data), enabled);
             } else if (what == "seam") {
                 const SeamId id{fresh(words.id())};
@@ -567,7 +546,7 @@ std::variant<SavedScene, FileError> fromText(std::string_view text) {
                 const std::string how = words.word();
                 if (how == "hidden") state.bodyHidden = true;
                 else if (how == "seethrough") state.bodySeeThrough = true;
-                else throw Problem{"\"" + how + "\" is not a way of showing the body this version knows"};
+                else throw Problem{std::format("\"{}\" is not a way of showing the body this version knows", how)};
             } else if (what == "drape") {
                 if (state.drape) throw Problem{"there is a second drape"};
                 state.drape.emplace();
@@ -596,7 +575,7 @@ std::variant<SavedScene, FileError> fromText(std::string_view text) {
                     throw Problem{"there is a triangle more than the cloth announces"};
                 state.drape->panels.back().triangles.push_back(readTriangle(words, drape.particles, "a triangle of the cloth names a particle that is not there"));
             } else {
-                throw Problem{"\"" + what + "\" is not something this version knows"};
+                throw Problem{std::format("\"{}\" is not something this version knows", what)};
             }
             if (!words.done()) throw Problem{"there is more on the line than expected"};
         } catch (const Problem& problem) {
@@ -638,24 +617,24 @@ std::string save(const Document& doc, const std::string& path, const SceneState&
     std::error_code ignored;
     {
         std::ofstream file(beside, std::ios::binary | std::ios::trunc);
-        if (!file) return "could not open \"" + path + "\" for writing";
+        if (!file) return std::format("could not open \"{}\" for writing", path);
         file << toText(doc, state);
         file.close();
         if (!file) {
             std::filesystem::remove(beside, ignored);
-            return "could not write \"" + path + "\"";
+            return std::format("could not write \"{}\"", path);
         }
     }
     if (replaceFile(beside, target)) {
         std::filesystem::remove(beside, ignored);
-        return "could not replace \"" + path + "\": it may be read-only or open in another program";
+        return std::format("could not replace \"{}\": it may be read-only or open in another program", path);
     }
     return {};
 }
 
 std::variant<SavedScene, FileError> open(const std::string& path) {
     std::ifstream file(filePath(path), std::ios::binary);
-    if (!file) return FileError{0, "could not open \"" + path + "\""};
+    if (!file) return FileError{0, std::format("could not open \"{}\"", path)};
     std::ostringstream text;
     text << file.rdbuf();
     return fromText(text.str());
