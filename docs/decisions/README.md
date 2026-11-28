@@ -58,3 +58,4 @@ Write "reason not recorded" rather than guessing one.
 | 0026 | [What wins when goals clash; the drape is the artist's work](0026-what-wins-and-whose-the-drape-is.md) | 27 November 2026 |
 | 0027 | [Every change is a command; undo is a copy](0027-every-change-is-a-command.md) | 27 November 2026 |
 | 0028 | [After a crash the work comes back from a copy written after every change](0028-recovery-copy-after-every-change.md) | 28 November 2026 |
+| 0029 | [Core is checked by clang-tidy as it is built](0029-clang-tidy-on-core.md) | 28 November 2026 |

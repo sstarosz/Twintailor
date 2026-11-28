@@ -11,6 +11,7 @@ twintailor_library(core SOURCES
     src/Pattern.cpp
     src/Text.cpp
 )
+twintailor_clang_tidy(twintailor_core)
 if(TWINTAILOR_BUILD_TESTS)
     add_subdirectory(tests)
 endif()

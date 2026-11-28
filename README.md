@@ -88,7 +88,7 @@ avatar](docs/user-guide.md#your-own-avatar)).
 
 ## Build it
 
-Windows, Visual Studio, vcpkg, Qt 6.12 and the Vulkan SDK:
+Windows, Visual Studio (with its C++ Clang tools), vcpkg, Qt 6.12 and the Vulkan SDK:
 
     cmake --preset x64-win-msvc2026
     cmake --build --preset x64-win-msvc2026-release

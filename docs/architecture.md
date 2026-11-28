@@ -187,6 +187,9 @@ The budgets and the measured times are in
   the project's avatar are in `tests/integration/AvatarTests.cpp`.
 - **Every feature and every fix arrives with a test that fails without it.**
 - **Warnings are defects:** they stop the build (`twintailor_warnings()`).
+- **Core is checked by clang-tidy** as it is built (`libs/core/.clang-tidy`,
+  [decision 0029](decisions/0029-clang-tidy-on-core.md)); a finding stops the
+  build as a warning does.
 
 ## Conventions
 

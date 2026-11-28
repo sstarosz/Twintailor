@@ -1,0 +1,68 @@
+# What clang-tidy checks as core is built (cmake/Twintailor.cmake); a finding
+# stops the build, as a compiler warning does. Why these:
+# docs/decisions/0029-clang-tidy.md
+#
+# Whole families are on, and what is off is listed with the reason:
+#
+# bugprone-easily-swappable-parameters  x and y, low and high: pairs that belong together
+# misc-const-correctness                const is written where it helps a reader
+# misc-include-cleaner                  a header's includes are for its users too
+# misc-no-recursion                     formulas are trees, and panels are made from panels
+# misc-non-private-member-variables-in-classes   plain structs describe things
+# modernize-return-braced-init-list     a returned type is named where it helps a reader
+# modernize-use-designated-initializers  Vec2{x, y} says enough
+# modernize-use-nodiscard               on nearly every reading function: noise
+# modernize-use-trailing-return-type    the return type comes first
+# performance-enum-size                 no enum here is stored by the thousand
+# readability-avoid-nested-conditional-operator   chains of ?: that read as a table
+# readability-braces-around-statements, -inconsistent-ifelse-braces   one-line bodies
+# readability-function-cognitive-complexity   a reader's judgement
+# readability-identifier-length         a, b, x, y are the plain words
+# readability-implicit-bool-conversion  `if (pointer)` is plain
+# readability-isolate-declaration       double x = 0.0, y = 0.0;
+# readability-magic-numbers             geometry is full of 2 and 360
+# readability-math-missing-parentheses  the precedence of arithmetic is known
+# readability-named-parameter           an unused parameter has no name
+# readability-redundant-member-init     `{}` lets a designated initializer leave a field out
+#
+# Of cppcoreguidelines only those that find mistakes; the rest asks for another style.
+Checks: >
+  -*,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  clang-analyzer-*,
+  cppcoreguidelines-init-variables,
+  cppcoreguidelines-pro-type-member-init,
+  cppcoreguidelines-pro-type-vararg,
+  cppcoreguidelines-slicing,
+  misc-*,
+  -misc-const-correctness,
+  -misc-include-cleaner,
+  -misc-no-recursion,
+  -misc-non-private-member-variables-in-classes,
+  modernize-*,
+  -modernize-return-braced-init-list,
+  -modernize-use-designated-initializers,
+  -modernize-use-nodiscard,
+  -modernize-use-trailing-return-type,
+  performance-*,
+  -performance-enum-size,
+  readability-*,
+  -readability-avoid-nested-conditional-operator,
+  -readability-braces-around-statements,
+  -readability-function-cognitive-complexity,
+  -readability-identifier-length,
+  -readability-implicit-bool-conversion,
+  -readability-inconsistent-ifelse-braces,
+  -readability-isolate-declaration,
+  -readability-magic-numbers,
+  -readability-math-missing-parentheses,
+  -readability-named-parameter,
+  -readability-redundant-member-init
+
+CheckOptions:
+  # `(void)` says that a result is meant to be dropped.
+  bugprone-unused-return-value.AllowCastToVoid: true
+
+# The headers of this library; those it uses are checked where they belong.
+HeaderFilterRegex: 'libs[\\/]core[\\/](include|src)[\\/]'
