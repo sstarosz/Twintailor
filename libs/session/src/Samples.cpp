@@ -137,8 +137,8 @@ Shirt addTshirtBody(Document& doc) {
     sew(front.fold.image(front.body.right()), back.body.right());
     sew(front.body.top(), back.fold.image(back.body.top()));
     sew(front.fold.image(front.body.top()), back.body.top());
-    doc.arrange(front.panel, Arrangement{.placed = true, .x = 0, .y = 104, .z = 14, .wrap = 165});
-    doc.arrange(back.panel, Arrangement{.placed = true, .x = 0, .y = 104, .z = -14, .turn = 180, .wrap = 165});
+    doc.arrange(front.panel, Arrangement{.placed = true, .at = {0, 104, 14}, .wrap = 165});
+    doc.arrange(back.panel, Arrangement{.placed = true, .at = {0, 104, -14}, .turn = 180, .wrap = 165});
     return Shirt{.ease = ease, .length = length, .front = front.panel, .back = back.panel};
 }
 
@@ -224,7 +224,7 @@ void addTrousers(Document& doc) {
     // backs behind it, inside the arms, which hang beside the hips. The hem
     // starts 6 cm above the floor.
     const auto stand = [&](PanelId panel, double x, double z, double turn) {
-        doc.arrange(panel, Arrangement{.placed = true, .x = x, .y = 52, .z = z, .turn = turn, .wrap = 180});
+        doc.arrange(panel, Arrangement{.placed = true, .at = {x, 52, z}, .turn = turn, .wrap = 180});
     };
     stand(front.panel, -11.5, 22, 0);
     stand(back.panel, -11.5, -23, 180);
@@ -250,8 +250,8 @@ Document tshirtAndTrousers() {
     doc.set(shirt.length, 52_cm);
     for (PanelId panel : {shirt.front, shirt.back}) {
         Arrangement raised = doc.get(panel).arrangement;
-        raised.y = 111;  // the shoulders stay where they were: half of what was taken off
-        raised.z = raised.z > 0 ? 36 : -37;  // well outside the trousers' fronts and backs
+        raised.at.y = 111;  // the shoulders stay where they were: half of what was taken off
+        raised.at.z = raised.at.z > 0 ? 36 : -37;  // well outside the trousers' fronts and backs
         raised.wrap = 140;
         doc.arrange(panel, raised);
     }
@@ -280,13 +280,13 @@ void layOutOnTheTable(Document& doc) {
     const std::vector<PanelId> panels = doc.panels();
     if (panels.size() < 2) return;
     for (PanelId panel : panels)
-        if (doc.get(panel).x != 0.0 || doc.get(panel).y != 0.0) return;
+        if (doc.get(panel).at != Vec2{}) return;
     const Result laidOut = evaluate(doc);
     double nextX = 0.0;
     for (PanelId panel : panels) {
         const std::optional<Bounds> box = bounds(laidOut[panel]);
         if (!box) continue;
-        doc.place(panel, nextX - box->min.x, -box->min.y);
+        doc.place(panel, {nextX - box->min.x, -box->min.y});
         nextX += box->max.x - box->min.x + 12_cm;
     }
 }

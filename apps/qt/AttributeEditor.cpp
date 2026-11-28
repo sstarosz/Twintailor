@@ -295,10 +295,10 @@ void AttributeEditor::show(const Document& doc, const Result& shapes, std::optio
     const twintailor::Panel& p = doc.get(*panel);  // QFrame has a Panel of its own
     rebuildLayers(doc, shapes);
 
-    const Arrangement& at = p.arrangement;
-    const double space[] = {at.x, at.y, at.z, at.turn, at.tilt, at.roll, at.wrap};
+    const Arrangement& in = p.arrangement;
+    const double space[] = {in.at.x, in.at.y, in.at.z, in.turn, in.tilt, in.roll, in.wrap};
     for (std::size_t i = 0; i < space_.size(); ++i) space_[i]->show(Expr(space[i]), doc, shapes);
-    const double table[] = {p.x, p.y, p.angle};
+    const double table[] = {p.at.x, p.at.y, p.angle};
     for (std::size_t i = 0; i < table_.size(); ++i) table_[i]->show(Expr(table[i]), doc, shapes);
     // A base for instances is not cut from cloth: it has no particles.
     particlesSection_->setVisible(!p.construction);

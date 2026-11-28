@@ -77,7 +77,7 @@ TEST_CASE("a sewn tube stays on the hips")
     doc.add(Seam{.a = {band, rect.left()}, .b = {band, rect.right()}});
     const Body& body = project::avatar();
     const double waistLine = project::avatarWaist, hipLine = project::avatarHips;
-    doc.arrange(band, Arrangement{.placed = true, .x = 0, .y = waistLine + 2, .z = 80.0 / (2 * pi), .wrap = 358});
+    doc.arrange(band, Arrangement{.placed = true, .at = {0, waistLine + 2, 80.0 / (2 * pi)}, .wrap = 358});
     const ClothMesh mesh = meshOf(doc, evaluate(doc), {.particleDistance = 2_cm});
     Cloth cloth(mesh, arranged(doc, mesh));
     run(cloth, body, 5.0);
@@ -120,8 +120,8 @@ TEST_CASE("a band sewn shut, with a skirt sewn to it, closes every seam on a bod
         const OpRef<Rect> s = doc.add(skirt, Rect{.width = Expr(skirtWidth), .height = 50_cm});
         doc.add(Seam{.a = {band, b.left()}, .b = {band, b.right()}});
         doc.add(Seam{.a = {band, b.bottom()}, .b = {skirt, s.top()}, .reversed = true});
-        doc.arrange(band, Arrangement{.placed = true, .x = 0, .y = 108, .z = 72.0 / (2 * pi), .wrap = 350});
-        doc.arrange(skirt, Arrangement{.placed = true, .x = 0, .y = 80, .z = skirtWidth / (2 * pi) + 3, .wrap = 340});
+        doc.arrange(band, Arrangement{.placed = true, .at = {0, 108, 72.0 / (2 * pi)}, .wrap = 350});
+        doc.arrange(skirt, Arrangement{.placed = true, .at = {0, 80, skirtWidth / (2 * pi) + 3}, .wrap = 340});
         const ClothMesh mesh = meshOf(doc, evaluate(doc), {.particleDistance = 2_cm});
         Cloth cloth(mesh, arranged(doc, mesh));
         run(cloth, project::avatar(), 6.0);
@@ -164,8 +164,8 @@ TEST_CASE("a T-shirt body shaped with added points sews shut on a body")
     sew(frontFold.image(frontBody.right()), backBody.right());
     sew(frontBody.top(), backFold.image(backBody.top()));
     sew(frontFold.image(frontBody.top()), backBody.top());
-    doc.arrange(front, Arrangement{.placed = true, .x = 0, .y = 104, .z = 14, .wrap = 165});
-    doc.arrange(back, Arrangement{.placed = true, .x = 0, .y = 104, .z = -14, .turn = 180, .wrap = 165});
+    doc.arrange(front, Arrangement{.placed = true, .at = {0, 104, 14}, .wrap = 165});
+    doc.arrange(back, Arrangement{.placed = true, .at = {0, 104, -14}, .turn = 180, .wrap = 165});
 
     const Result shapes = evaluate(doc);
     REQUIRE(shapes.ok());
@@ -317,8 +317,8 @@ TEST_CASE("a draped skirt made longer keeps its waist and grows at the hem")
     const OpRef<Rect> rect = doc.add(skirt, Rect{.width = 105_cm, .height = length});
     doc.add(Seam{.a = {band, bandRect.left()}, .b = {band, bandRect.right()}});
     doc.add(Seam{.a = {band, bandRect.bottom()}, .b = {skirt, rect.top()}, .reversed = true});
-    doc.arrange(band, Arrangement{.placed = true, .x = 0, .y = 108, .z = 72.0 / (2 * pi), .wrap = 350});
-    doc.arrange(skirt, Arrangement{.placed = true, .x = 0, .y = 80, .z = 105.0 / (2 * pi) + 3, .wrap = 340});
+    doc.arrange(band, Arrangement{.placed = true, .at = {0, 108, 72.0 / (2 * pi)}, .wrap = 350});
+    doc.arrange(skirt, Arrangement{.placed = true, .at = {0, 80, 105.0 / (2 * pi) + 3}, .wrap = 340});
     session::Session session(doc, session::Threading::OneStepPerAdvance);
     onTheAvatar(session);
     session.simulate(true);

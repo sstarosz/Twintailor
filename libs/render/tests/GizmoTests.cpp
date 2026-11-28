@@ -288,7 +288,7 @@ TEST_CASE("the gizmo stands where a panel's arrangement places it, turned as the
     Document doc;
     const PanelId front = doc.add(Panel{.name = "front"});
     doc.add(front, Rect{.width = 40_cm, .height = 60_cm});
-    doc.arrange(front, Arrangement{.placed = true, .x = 5, .y = 110, .z = 25, .turn = 90});
+    doc.arrange(front, Arrangement{.placed = true, .at = {5, 110, 25}, .turn = 90});
     session::Session session(doc, session::Threading::OneStepPerAdvance);
     session.update();
     const std::optional<Gizmo> shown = gizmoOf(session, front, GizmoMode::Scale, 2.0);
@@ -304,7 +304,7 @@ TEST_CASE("the gizmo of cloth that has fallen stands on the cloth, at the spot t
     Document doc;
     const PanelId sheet = doc.add(Panel{.name = "sheet"});
     doc.add(sheet, Rect{.width = 40_cm, .height = 60_cm});
-    doc.arrange(sheet, Arrangement{.placed = true, .x = 5, .y = 150, .z = 25, .turn = 90, .anchor = Vec2{20, 30}});
+    doc.arrange(sheet, Arrangement{.placed = true, .at = {5, 150, 25}, .turn = 90, .anchor = Vec2{20, 30}});
     session::Session session(doc, session::Threading::OneStepPerAdvance);
     session.simulate(true);
     for (int i = 0; i < 30; ++i) session.update();  // no body: it falls

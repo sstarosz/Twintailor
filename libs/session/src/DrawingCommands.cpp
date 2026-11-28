@@ -36,7 +36,7 @@ DrawnPoint onDrawnSide(const Document& doc, PanelId panel, const EdgePoint& show
 
 std::expected<AddPanel::Done, std::string> AddPanel::apply(Document& doc, const Result&) const {
     const char* kind = std::holds_alternative<Rect>(shape) ? "panel" : std::holds_alternative<Circle>(shape) ? "circle" : "skirt";
-    const PanelId panel = doc.add(Panel{.name = name.empty() ? numberedName(doc, kind) : name, .x = at.x, .y = at.y});
+    const PanelId panel = doc.add(Panel{.name = name.empty() ? numberedName(doc, kind) : name, .at = at});
     const OpId first = std::visit([&](const auto& starting) { return OpId(doc.add(panel, starting)); }, shape);
     return Done{panel, first};
 }
@@ -118,7 +118,7 @@ std::expected<SplitPanel::Done, std::string> SplitPanel::apply(Document& doc, co
     // The panel keeps one side; a new panel is what the cut removes.
     const OpRef<Cut> cut = doc.add(panel, Cut{.along = line, .keep = Cut::Side::Left});
     const Panel& source = doc.get(panel);
-    const Panel like{.name = numberedName(doc, source.name + " part"), .x = source.x, .y = source.y};
+    const Panel like{.name = numberedName(doc, source.name + " part"), .at = source.at};
     const PanelId part = doc.add(like);
     doc.add(part, Offcut{.of = cut});
     return Done{part};

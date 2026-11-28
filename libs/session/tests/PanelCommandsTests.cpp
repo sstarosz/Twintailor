@@ -24,7 +24,7 @@ struct Two {
     Two() {
         a = doc.add(Panel{.name = "a"});
         rect = doc.add(a, Rect{.width = 20_cm, .height = 10_cm});
-        b = doc.add(Panel{.name = "b", .x = 40});
+        b = doc.add(Panel{.name = "b", .at = {40, 0}});
         doc.add(b, Rect{.width = 20_cm, .height = 10_cm});
     }
 };
@@ -41,11 +41,11 @@ TEST_CASE("panels are moved by one command, each by as much; their places in spa
     const std::uint64_t shapes = editor.shapesVersion();
     REQUIRE(editor.run(MovePanels{{start.a, start.b}, {5, -2}}));
     const Document& doc = editor.document();
-    EXPECT((doc.get(start.a).x == 5.0 && doc.get(start.a).y == -2.0 && doc.get(start.b).x == 45.0), "both moved by as much");
+    EXPECT((doc.get(start.a).at.x == 5.0 && doc.get(start.a).at.y == -2.0 && doc.get(start.b).at.x == 45.0), "both moved by as much");
     EXPECT((doc.get(start.a).arrangement == inSpace && editor.shapesVersion() == shapes), "placing on the table is neither shape nor space");
-    EXPECT((editor.undo() && editor.document().get(start.b).x == 40.0 && !editor.canUndo()), "one undo step");
+    EXPECT((editor.undo() && editor.document().get(start.b).at.x == 40.0 && !editor.canUndo()), "one undo step");
     const auto gone = editor.run(MovePanels{{start.a, PanelId{999}}, {1, 1}});
-    EXPECT((!gone && editor.document().get(start.a).x == 0.0), "a panel that is not there refuses the whole command");
+    EXPECT((!gone && editor.document().get(start.a).at.x == 0.0), "a panel that is not there refuses the whole command");
 }
 
 TEST_CASE("one panel turns about the middle of its own box, several about the middle of their group")
@@ -53,11 +53,11 @@ TEST_CASE("one panel turns about the middle of its own box, several about the mi
     Two start;
     Editor editor(start.doc);
     REQUIRE(editor.run(TurnPanels{{start.a}, 180}));
-    EXPECT((close(editor.document().get(start.a).x, 20) && close(editor.document().get(start.a).y, 10)), "its box stays: the origin goes to the far corner");
+    EXPECT((close(editor.document().get(start.a).at.x, 20) && close(editor.document().get(start.a).at.y, 10)), "its box stays: the origin goes to the far corner");
     REQUIRE(editor.undo());
     REQUIRE(editor.run(TurnPanels{{start.a, start.b}, 180}));
     const Document& doc = editor.document();
-    EXPECT((close(doc.get(start.a).x, 60) && close(doc.get(start.b).x, 20) && doc.get(start.b).angle == 180.0), "about (30, 5), the middle of the two");
+    EXPECT((close(doc.get(start.a).at.x, 60) && close(doc.get(start.b).at.x, 20) && doc.get(start.b).angle == 180.0), "about (30, 5), the middle of the two");
 }
 
 TEST_CASE("panels are scaled by one command: the lengths of a plain shape change, about the middle of the panel")
@@ -67,7 +67,7 @@ TEST_CASE("panels are scaled by one command: the lengths of a plain shape change
     REQUIRE(editor.run(ScalePanels{{start.a}, 2.0, 3.0}));
     const Panel& placed = editor.document().get(start.a);
     EXPECT((editor.shapes()[start.a].length(start.rect.bottom()) == 40.0 && editor.document().operations(start.a).size() == 1), "no layer is added");
-    EXPECT((close(placed.x, -10) && close(placed.y, -10)), "the middle stays at (10, 5)");
+    EXPECT((close(placed.at.x, -10) && close(placed.at.y, -10)), "the middle stays at (10, 5)");
     EXPECT((editor.undo() && !editor.canUndo()), "one undo step");
 
     const auto uneven = editor.run(ScalePanels{{start.a, start.b}, 2.0, 1.0});
@@ -79,13 +79,13 @@ TEST_CASE("panels are scaled by one command: the lengths of a plain shape change
 TEST_CASE("a panel is moved and turned in space; one without a place starts from where the table has it")
 {
     Two start;
-    start.doc.arrange(start.a, Arrangement{.placed = true, .x = 5, .y = 100, .z = 20});
+    start.doc.arrange(start.a, Arrangement{.placed = true, .at = {5, 100, 20}});
     const PanelId empty = start.doc.add(Panel{.name = "empty"});
     Editor editor(start.doc);
     REQUIRE(editor.run(MovePanelInSpace{start.a, {1, 2, 3}}));
     REQUIRE(editor.run(TurnPanelInSpace{start.a, {0, 1, 0}, 90}));
     const Arrangement now = editor.document().get(start.a).arrangement;
-    EXPECT((now.x == 6.0 && now.y == 102.0 && now.z == 23.0 && close(now.turn, 90)), "carried, then turned about its anchor");
+    EXPECT((now.at.x == 6.0 && now.at.y == 102.0 && now.at.z == 23.0 && close(now.turn, 90)), "carried, then turned about its anchor");
 
     // A base for instances is never given a place by itself.
     REQUIRE(editor.change([&](Document& doc) { doc.setConstruction(start.b, true); doc.arrange(start.b, Arrangement{}); }, {.touches = Touches::PlacementOnly}));
@@ -99,7 +99,7 @@ TEST_CASE("a panel is placed in space again from where the table has it, keeping
 {
     Two start;
     Editor editor(start.doc);
-    const double first = editor.document().get(start.a).arrangement.x;
+    const double first = editor.document().get(start.a).arrangement.at.x;
     REQUIRE(editor.change([&](Document& doc) {
         Arrangement said = doc.get(start.a).arrangement;
         said.anchor = Vec2{2, 3};
@@ -108,7 +108,7 @@ TEST_CASE("a panel is placed in space again from where the table has it, keeping
     REQUIRE(editor.run(MovePanels{{start.a}, {100, 0}}));
     REQUIRE(editor.run(PlaceFromTable{start.a}));
     const Arrangement again = editor.document().get(start.a).arrangement;
-    EXPECT((again.placed && again.x != first && again.anchor && again.anchor->x == 2.0), "where the table has it now");
+    EXPECT((again.placed && again.at.x != first && again.anchor && again.anchor->x == 2.0), "where the table has it now");
 }
 
 TEST_CASE("a number of a panel's place is set by its name; a formula for it is worked out once")
@@ -122,9 +122,9 @@ TEST_CASE("a number of a panel's place is set by its name; a formula for it is w
     REQUIRE(editor.run(SetField{PanelField{start.a, TableField::X}, 7_cm}));
     REQUIRE(editor.run(SetField{PanelField{start.a, TableField::Angle}, 45_deg}));
     const Panel& placed = editor.document().get(start.a);
-    EXPECT((placed.arrangement.wrap == 120.0 && placed.arrangement.y == 30.0), "in space");
-    EXPECT((placed.x == 7.0 && placed.y == 0.0 && placed.angle == 45.0), "and on the table, the other numbers as they were");
+    EXPECT((placed.arrangement.wrap == 120.0 && placed.arrangement.at.y == 30.0), "in space");
+    EXPECT((placed.at.x == 7.0 && placed.at.y == 0.0 && placed.angle == 45.0), "and on the table, the other numbers as they were");
     EXPECT((editor.shapesVersion() == shapes), "no outline is worked out again");
     REQUIRE(editor.run(SetField{wide, 50_cm}));
-    EXPECT((editor.document().get(start.a).arrangement.y == 30.0), "the place keeps the number the formula came to");
+    EXPECT((editor.document().get(start.a).arrangement.at.y == 30.0), "the place keeps the number the formula came to");
 }

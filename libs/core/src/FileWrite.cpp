@@ -122,11 +122,11 @@ std::string toText(const Document& doc, const SceneState& state) {
     }
     for (PanelId id : doc.panels()) {
         const Panel& panel = doc.get(id);
-        add(out, "panel {} {} {:d} {:.17g} {:.17g} {:.17g}", id.value, quoted(panel.name), panel.construction, panel.x, panel.y, panel.angle);
+        add(out, "panel {} {} {:d} {:.17g} {:.17g} {:.17g}", id.value, quoted(panel.name), panel.construction, panel.at.x, panel.at.y, panel.angle);
         if (panel.particleDistance) add(out, " {:.17g}", *panel.particleDistance);
         out += '\n';
         if (const Arrangement& in = panel.arrangement; in.placed) {
-            add(out, "arrange {:.17g} {:.17g} {:.17g} {:.17g} {:.17g} {:.17g} {:.17g}", in.x, in.y, in.z, in.turn, in.tilt, in.roll, in.wrap);
+            add(out, "arrange {:.17g} {:.17g} {:.17g} {:.17g} {:.17g} {:.17g} {:.17g}", in.at.x, in.at.y, in.at.z, in.turn, in.tilt, in.roll, in.wrap);
             if (in.anchor) add(out, " {:.17g} {:.17g}", in.anchor->x, in.anchor->y);
             out += '\n';
         }

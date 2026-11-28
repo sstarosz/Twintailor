@@ -125,11 +125,7 @@ PanelCopy Document::copy(PanelId source, Panel description) {
 
 void Document::rename(PanelId panel, std::string name) { entry(panel).panel.name = std::move(name); }
 
-void Document::place(PanelId panel, double x, double y) {
-    Panel& p = entry(panel).panel;
-    p.x = x;
-    p.y = y;
-}
+void Document::place(PanelId panel, Vec2 at) { entry(panel).panel.at = at; }
 
 void Document::turn(PanelId panel, double degrees) { entry(panel).panel.angle = degrees; }
 

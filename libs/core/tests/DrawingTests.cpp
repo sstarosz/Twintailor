@@ -20,11 +20,11 @@ using namespace twintailor;
 TEST_CASE("panels have a place and clicks snap to the outline")
 {
     Document doc;
-    PanelId panel = doc.add(Panel{.name = "panel", .x = 5.0, .y = 7.0});
+    PanelId panel = doc.add(Panel{.name = "panel", .at = {5.0, 7.0}});
     OpRef<Rect> rect = doc.add(panel, Rect{.width = 40_cm, .height = 20_cm});
-    EXPECT_NEAR((doc.get(panel).x), (5.0), "a panel can be created at a place");
-    doc.place(panel, 100.0, -20.0);
-    EXPECT_NEAR((doc.get(panel).y), (-20.0), "and moved");
+    EXPECT_NEAR((doc.get(panel).at.x), (5.0), "a panel can be created at a place");
+    doc.place(panel, {100.0, -20.0});
+    EXPECT_NEAR((doc.get(panel).at.y), (-20.0), "and moved");
     Result result = evaluate(doc);
     EXPECT_NEAR((result[panel].position(rect.bottomLeft()).x), (0.0), "placing does not change the panel's own shape");
 

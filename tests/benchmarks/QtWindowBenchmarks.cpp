@@ -48,14 +48,14 @@ namespace {
 // A garment the size of a skirt, arranged around the body and sewn.
 Document skirt() {
     Document doc;
-    const PanelId front = doc.add(Panel{.name = "front", .x = 20, .y = 20});
+    const PanelId front = doc.add(Panel{.name = "front", .at = {20, 20}});
     const OpRef<Rect> frontRect = doc.add(front, Rect{.width = 60_cm, .height = 80_cm});
-    const PanelId back = doc.add(Panel{.name = "back", .x = 100, .y = 20});
+    const PanelId back = doc.add(Panel{.name = "back", .at = {100, 20}});
     const OpRef<Rect> backRect = doc.add(back, Rect{.width = 60_cm, .height = 80_cm});
     doc.add(Seam{.a = {front, frontRect.right()}, .b = {back, backRect.left()}});
     doc.add(Seam{.a = {front, frontRect.left()}, .b = {back, backRect.right()}});
-    doc.arrange(front, Arrangement{.placed = true, .x = 0, .y = 90, .z = 26, .wrap = 100});
-    doc.arrange(back, Arrangement{.placed = true, .x = 0, .y = 90, .z = -26, .turn = 180, .wrap = 100});
+    doc.arrange(front, Arrangement{.placed = true, .at = {0, 90, 26}, .wrap = 100});
+    doc.arrange(back, Arrangement{.placed = true, .at = {0, 90, -26}, .turn = 180, .wrap = 100});
     return doc;
 }
 
@@ -223,7 +223,7 @@ perf::Frames cornerDragged(MainWindow& window, perf::Report& report, const std::
     window.select(front);
     frame(window);
     const Panel& placed = window.session().document().get(front);
-    QPointF corner = table->toScreen({placed.x + 60, placed.y + 80});
+    QPointF corner = table->toScreen({placed.at.x + 60, placed.at.y + 80});
     mouse(table, QEvent::MouseButtonPress, corner, Qt::LeftButton);
     const std::uint64_t versionAtGrab = window.session().editor().version();
     const perf::Frames spent = dragged(
@@ -245,15 +245,15 @@ perf::Frames panelDragged(MainWindow& window, perf::Report& report, const std::s
     const PanelId front = window.session().document().panels().front();
     window.select(front);
     frame(window);
-    const double xBefore = window.session().document().get(front).x;
-    QPointF on = table->toScreen({xBefore + 30, window.session().document().get(front).y + 40});
+    const double xBefore = window.session().document().get(front).at.x;
+    QPointF on = table->toScreen({xBefore + 30, window.session().document().get(front).at.y + 40});
     mouse(table, QEvent::MouseButtonPress, on, Qt::LeftButton);
     const perf::Frames spent = dragged(window, 40, [&](int) {
         on += QPointF(4, 0);
         mouse(table, QEvent::MouseMove, on, Qt::LeftButton);
     });
     mouse(table, QEvent::MouseButtonRelease, on, Qt::NoButton);
-    report.expect(window.session().document().get(front).x != xBefore, what + ": the panel moves");
+    report.expect(window.session().document().get(front).at.x != xBefore, what + ": the panel moves");
     window.shelf()->undo()->trigger();
     return spent;
 }
@@ -514,8 +514,8 @@ int main(int argc, char** argv) {
         for (int i = 0; i < 3; ++i) frame(window);
         TableView* table = window.table();
         const PanelId front = window.session().document().panels().front();
-        const double xBefore = window.session().document().get(front).x;
-        QPointF on = table->toScreen({xBefore + 30, window.session().document().get(front).y + 40});
+        const double xBefore = window.session().document().get(front).at.x;
+        QPointF on = table->toScreen({xBefore + 30, window.session().document().get(front).at.y + 40});
         mouse(table, QEvent::MouseButtonPress, on, Qt::LeftButton);
         const std::uint64_t meshesBeforeDrag = window.session().meshesMade();
         const double drag = perf::bestMilliseconds(
@@ -527,7 +527,7 @@ int main(int argc, char** argv) {
             40);
         mouse(table, QEvent::MouseButtonRelease, on, Qt::NoButton);
         report.record("frame while dragging a panel on the table", 8.0, drag);
-        report.expect(window.session().document().get(front).x != xBefore && window.session().meshesMade() == meshesBeforeDrag, "the panel moves and is not meshed again");
+        report.expect(window.session().document().get(front).at.x != xBefore && window.session().meshesMade() == meshesBeforeDrag, "the panel moves and is not meshed again");
 
         // ---- Dragging a corner, the mesh made on another thread, 1 cm particles ----
         // The shape changes every frame and the mesh follows it, but the frame
@@ -544,7 +544,7 @@ int main(int argc, char** argv) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(5));
             }
             const Panel& placed = window.session().document().get(front);
-            QPointF corner = table->toScreen({placed.x + 60, placed.y + 80});
+            QPointF corner = table->toScreen({placed.at.x + 60, placed.at.y + 80});
             mouse(table, QEvent::MouseButtonPress, corner, Qt::LeftButton);
             const std::uint64_t meshesAtGrab = window.session().meshesMade();
             double sum = 0.0;

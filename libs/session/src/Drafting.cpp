@@ -80,7 +80,7 @@ void Drafting::cancelTyping(Session& session) {
 void Drafting::carry(const Document& doc, PanelId panel) {
     const Panel& placed = doc.get(panel);
     std::vector<PanelId> panels = selection.has(panel) ? selectedInOrder(doc, selection) : std::vector<PanelId>{panel};
-    carried_ = Carried{panel, std::move(panels), placed.x, placed.y, placed.angle};
+    carried_ = Carried{panel, std::move(panels), placed.at, placed.angle};
 }
 
 std::vector<PanelId> Drafting::Selection::panels() const {
@@ -239,7 +239,7 @@ Outcome Drafting::on(Session& session, const MovePanel& g) {
     // A move says where the panel is to be, so one that was not seen to begin can start here.
     if (g.phase == DragPhase::Begin || !carrying(g.panel)) carry(session.document(), g.panel);
     std::erase_if(carried_->panels, [&](PanelId panel) { return !session.document().contains(panel); });
-    taken(session.preview(dragIn(session), MovePanels{carried_->panels, {g.x - carried_->x, g.y - carried_->y}}), outcome);
+    taken(session.preview(dragIn(session), MovePanels{carried_->panels, Vec2{g.x, g.y} - carried_->at}), outcome);
     if (g.phase == DragPhase::End) carried_.reset();
     return outcome;
 }

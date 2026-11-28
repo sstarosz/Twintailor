@@ -215,7 +215,7 @@ TEST_CASE("a corner that a formula places is not moved, and the command says why
 TEST_CASE("a mirrored instance is a command that hands back the new panels and how they were sewn")
 {
     Front start;
-    const PanelId back = start.doc.add(Panel{.name = "back", .x = 40});
+    const PanelId back = start.doc.add(Panel{.name = "back", .at = {40, 0}});
     const OpRef<Rect> backRect = start.doc.add(back, Rect{.width = start.width, .height = 40_cm});
     start.doc.add(Seam{.a = {start.panel, start.rect.right()}, .b = {back, backRect.left()}});
     Editor editor(start.doc);
@@ -296,16 +296,16 @@ TEST_CASE("a length typed on the table leaves a panel without seams where it is,
     const Panel before = Editor(start.doc).document().get(start.panel);
 
     const Panel alone = placeAfter(start.doc, taller);
-    EXPECT((alone.x == before.x && alone.y == before.y && alone.arrangement == before.arrangement), "without seams it stays, on the table and in space");
+    EXPECT((alone.at.x == before.at.x && alone.at.y == before.at.y && alone.arrangement == before.arrangement), "without seams it stays, on the table and in space");
 
     Document sewnDoc = start.doc;
-    const PanelId band = sewnDoc.add(Panel{.name = "band", .x = 50});
+    const PanelId band = sewnDoc.add(Panel{.name = "band", .at = {50, 0}});
     const OpRef<Rect> bandRect = sewnDoc.add(band, Rect{.width = 20_cm, .height = 4_cm});
     sewnDoc.add(Seam{.a = {start.panel, start.rect.top()}, .b = {band, bandRect.bottom()}, .reversed = true});
     SetField anywhere = taller;
     anywhere.grows = Grows::AwayFromSeams;
     const Panel sewn = placeAfter(sewnDoc, taller), grown = placeAfter(sewnDoc, anywhere);
-    EXPECT((sewn.y == grown.y && sewn.arrangement == grown.arrangement), "sewn, it grows as it does for a formula or a field");
-    EXPECT((sewn.y != alone.y), "which moves it on the table, so that the seam stays");
+    EXPECT((sewn.at.y == grown.at.y && sewn.arrangement == grown.arrangement), "sewn, it grows as it does for a formula or a field");
+    EXPECT((sewn.at.y != alone.at.y), "which moves it on the table, so that the seam stays");
 }
 

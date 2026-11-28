@@ -22,7 +22,7 @@ struct Two {
     Two() {
         front = doc.add(Panel{.name = "front"});
         a = doc.add(front, Rect{.width = 20_cm, .height = 40_cm});
-        back = doc.add(Panel{.name = "back", .x = 40});
+        back = doc.add(Panel{.name = "back", .at = {40, 0}});
         b = doc.add(back, Rect{.width = 20_cm, .height = 40_cm});
     }
 };

@@ -85,13 +85,13 @@ std::optional<Bounds> boxOfOneLike(const Document& doc, const Result& shapes, Pa
 // spare. A mirrored panel's own left edge is the source's right one.
 Vec2 besideSource(const Document& doc, const Result& shapes, PanelId source, Follow how) {
     const Panel& from = doc.get(source);
-    double x = from.x + 30_cm;
+    double x = from.at.x + 30_cm;
     if (const std::optional<Bounds> box = boxOfOneLike(doc, shapes, source, how)) {
         const double newLeft = how == Follow::MirroredInstance ? -box->max.x : box->min.x;
         const std::optional<Bounds> placed = bounds(turned(shapes[source], from.angle));
-        x = from.x + (placed ? placed->max.x : box->max.x) + 12_cm - newLeft;
+        x = from.at.x + (placed ? placed->max.x : box->max.x) + 12_cm - newLeft;
     }
-    return {x, from.y};
+    return {x, from.at.y};
 }
 
 // Where each of several new panels goes, or one with a place of its own: the
@@ -104,16 +104,17 @@ std::vector<Vec2> groupPlaces(const Document& doc, const Result& shapes, const s
         const Panel& from = doc.get(source);
         const std::optional<Bounds> box = boxOfOneLike(doc, shapes, source, how);
         const Bounds own = box ? *box : Bounds{};
-        low = {std::min(low.x, from.x + own.min.x), std::min(low.y, from.y + own.min.y)};
-        high = {std::max(high.x, from.x + own.max.x), std::max(high.y, from.y + own.max.y)};
+        const Vec2 first = from.at + own.min, last = from.at + own.max;
+        low = {std::min(low.x, first.x), std::min(low.y, first.y)};
+        high = {std::max(high.x, last.x), std::max(high.y, last.y)};
     }
     const Vec2 by = at ? Vec2{at->x - (low.x + high.x) / 2.0, at->y - (low.y + high.y) / 2.0} : Vec2{high.x - low.x + 12_cm, 0.0};
     std::vector<Vec2> places;
     for (PanelId source : sources) {
         const Panel& from = doc.get(source);
         // A mirrored instance's origin mirrors its source's, about the middle of the group.
-        const double x = how == Follow::MirroredInstance ? low.x + high.x - from.x : from.x;
-        places.push_back({x + by.x, from.y + by.y});
+        const double x = how == Follow::MirroredInstance ? low.x + high.x - from.at.x : from.at.x;
+        places.push_back(Vec2{x, from.at.y} + by);
     }
     return places;
 }
@@ -127,7 +128,7 @@ std::optional<Arrangement> mirrorImageInSpace(const Document& doc, const Result&
     Arrangement from = doc.get(source).arrangement;
     const Pattern& outline = shapes[source];
     const std::optional<Bounds> box = bounds(outline);
-    if (!from.placed || !box || std::abs(from.x) < (box->max.x - box->min.x) / 4.0) return std::nullopt;
+    if (!from.placed || !box || std::abs(from.at.x) < (box->max.x - box->min.x) / 4.0) return std::nullopt;
     // Said, though it may be the middle of the box: the instance's anchor is the image of this spot.
     from.anchor = sim::anchorOf(from, outline);
     return sim::mirrored(from);
@@ -160,9 +161,9 @@ std::optional<OpRef<AdjustPoint>> adjustmentOf(const Document& doc, PanelId pane
 
 double& numberOf(Arrangement& place, SpaceField field) {
     switch (field) {
-    case SpaceField::X: return place.x;
-    case SpaceField::Y: return place.y;
-    case SpaceField::Z: return place.z;
+    case SpaceField::X: return place.at.x;
+    case SpaceField::Y: return place.at.y;
+    case SpaceField::Z: return place.at.z;
     case SpaceField::Turn: return place.turn;
     case SpaceField::Tilt: return place.tilt;
     case SpaceField::Roll: return place.roll;
@@ -185,8 +186,9 @@ void setPlace(Document& doc, const PanelField& of, double number) {
         doc.turn(of.panel, number);
         return;
     }
-    const double x = table == TableField::X ? number : panel.x, y = table == TableField::Y ? number : panel.y;
-    doc.place(of.panel, x, y);
+    Vec2 at = panel.at;
+    (table == TableField::X ? at.x : at.y) = number;
+    doc.place(of.panel, at);
 }
 
 } // namespace
@@ -236,11 +238,11 @@ std::expected<DuplicatePanels::Done, std::string> DuplicatePanels::apply(Documen
             // As its source in all but its name and where it is. In space it has no place yet: it would stand inside the source.
             Panel like = doc.get(source);
             like.name = name;
-            like.x = places[i].x, like.y = places[i].y;
+            like.at = places[i];
             like.arrangement = {};
             done.panels.push_back(doc.copy(source, std::move(like)));
         } else {
-            const PanelId panel = doc.add(Panel{.name = name, .x = places[i].x, .y = places[i].y});
+            const PanelId panel = doc.add(Panel{.name = name, .at = places[i]});
             doc.add(panel, Instance{.source = source, .mirrored = how == Follow::MirroredInstance});
             if (how == Follow::MirroredInstance)
                 if (const std::optional<Arrangement> image = mirrorImageInSpace(doc, before, source)) doc.arrange(panel, *image);

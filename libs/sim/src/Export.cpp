@@ -18,7 +18,7 @@ namespace {
 // Where the table has a panel's own point: turned about the panel's origin, then moved there.
 Vec2 onTable(const Panel& panel, Vec2 own) {
     const Vec2 at = turned(own, panel.angle);
-    return {at.x + panel.x, at.y + panel.y};
+    return at + panel.at;
 }
 
 // The square of the table that the UVs' 0-1 square stands for.

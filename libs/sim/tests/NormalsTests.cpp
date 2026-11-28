@@ -22,11 +22,11 @@ Document bent(double apart = 0.0) {
     Document doc;
     const PanelId flat = doc.add(Panel{.name = "flat"});
     const OpRef<Rect> a = doc.add(flat, Rect{.width = 20_cm, .height = 20_cm});
-    doc.arrange(flat, Arrangement{.placed = true, .x = -10, .y = 100, .z = 0});
+    doc.arrange(flat, Arrangement{.placed = true, .at = {-10, 100, 0}});
     const PanelId side = doc.add(Panel{.name = "side"});
     const OpRef<Rect> b = doc.add(side, Rect{.width = 20_cm, .height = 20_cm});
     const double deep = 10.0 * std::sin(60.0 * std::numbers::pi / 180.0);
-    doc.arrange(side, Arrangement{.placed = true, .x = 5.0 + apart, .y = 100, .z = -deep, .turn = 60.0});
+    doc.arrange(side, Arrangement{.placed = true, .at = {5.0 + apart, 100, -deep}, .turn = 60.0});
     doc.add(Seam{.a = {flat, a.right()}, .b = {side, b.left()}});
     return doc;
 }

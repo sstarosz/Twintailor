@@ -28,7 +28,7 @@ std::expected<ScalePart, std::string> scalePartOf(const Document& doc, const Res
     if (const std::optional<Bounds> box = bounds(shapes[panel])) {
         part.ownMiddle = {(box->min.x + box->max.x) / 2.0, (box->min.y + box->max.y) / 2.0};
         const Vec2 own = turned(part.ownMiddle, placed.angle);
-        part.middle = {placed.x + own.x, placed.y + own.y};
+        part.middle = placed.at + own;
     }
     const std::string name = "the panel " + placed.name;
     const std::vector<OpId> layers = doc.operations(panel);
@@ -107,7 +107,7 @@ std::optional<Vec2> middleOfPanels(const Document& doc, const Result& shapes, co
         const Panel& placed = doc.get(panel);
         const std::optional<Bounds> box = bounds(turned(shapes[panel], placed.angle));
         if (!box) continue;
-        const Bounds here{{box->min.x + placed.x, box->min.y + placed.y}, {box->max.x + placed.x, box->max.y + placed.y}};
+        const Bounds here{box->min + placed.at, box->max + placed.at};
         if (!all) all = here;
         else all = Bounds{{std::min(all->min.x, here.min.x), std::min(all->min.y, here.min.y)}, {std::max(all->max.x, here.max.x), std::max(all->max.y, here.max.y)}};
     }
@@ -116,10 +116,7 @@ std::optional<Vec2> middleOfPanels(const Document& doc, const Result& shapes, co
 }
 
 std::expected<Nothing, std::string> MovePanels::apply(Document& doc, const Result&) const {
-    for (PanelId panel : panels) {
-        const double x = doc.get(panel).x + by.x, y = doc.get(panel).y + by.y;
-        doc.place(panel, x, y);
-    }
+    for (PanelId panel : panels) doc.place(panel, doc.get(panel).at + by);
     return Nothing{};
 }
 
@@ -131,15 +128,15 @@ std::expected<Nothing, std::string> TurnPanels::apply(Document& doc, const Resul
         const Panel& placed = doc.get(panels.front());
         const std::optional<Bounds> own = bounds(before[panels.front()]);
         const Vec2 centre = turned(own ? Vec2{(own->min.x + own->max.x) / 2.0, (own->min.y + own->max.y) / 2.0} : Vec2{}, placed.angle);
-        pivot = {placed.x + centre.x, placed.y + centre.y};
+        pivot = placed.at + centre;
     } else {
         pivot = middleOfPanels(doc, before, panels).value_or(Vec2{});
     }
     for (PanelId panel : panels) {
         const Panel& placed = doc.get(panel);
-        const Vec2 offset = turned(Vec2{placed.x - pivot.x, placed.y - pivot.y}, degrees);
+        const Vec2 offset = turned(placed.at - pivot, degrees);
         const double angle = placed.angle + degrees;
-        doc.place(panel, pivot.x + offset.x, pivot.y + offset.y);
+        doc.place(panel, pivot + offset);
         doc.turn(panel, angle);
     }
     return Nothing{};
@@ -178,13 +175,13 @@ std::expected<Nothing, std::string> ScalePanels::apply(Document& doc, const Resu
         const Vec2 middle{(box->min.x + box->max.x) / 2.0, (box->min.y + box->max.y) / 2.0};
         const Vec2 own = turned(middle, placed.angle);
         const Vec2 want{pivot.x + x * (part.middle.x - pivot.x), pivot.y + x * (part.middle.y - pivot.y)};
-        const Vec2 at{want.x - own.x, want.y - own.y};
+        const Vec2 at = want - own;
         // With no anchor said, the middle of the box is the anchor and follows by itself.
         Arrangement arranged = placed.arrangement;
         if (part.anchor) arranged.anchor = Vec2{part.anchor->x + (middle.x - part.ownMiddle.x), part.anchor->y + (middle.y - part.ownMiddle.y)};
-        const bool moves = std::abs(at.x - placed.x) > 1e-9 || std::abs(at.y - placed.y) > 1e-9;
+        const bool moves = std::abs(at.x - placed.at.x) > 1e-9 || std::abs(at.y - placed.at.y) > 1e-9;
         const bool anchored = !(arranged == placed.arrangement);
-        if (moves) doc.place(part.panel, at.x, at.y);
+        if (moves) doc.place(part.panel, at);
         if (anchored) doc.arrange(part.panel, arranged);
     }
     return Nothing{};
@@ -193,9 +190,7 @@ std::expected<Nothing, std::string> ScalePanels::apply(Document& doc, const Resu
 std::expected<Nothing, std::string> MovePanelInSpace::apply(Document& doc, const Result& before) const {
     std::expected<Arrangement, std::string> place = placeInSpace(doc, before, panel);
     if (!place) return std::unexpected(std::move(place.error()));
-    place->x += by.x;
-    place->y += by.y;
-    place->z += by.z;
+    place->at = place->at + by;
     place->placed = true;
     doc.arrange(panel, *place);
     return Nothing{};

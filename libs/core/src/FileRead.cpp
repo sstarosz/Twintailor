@@ -337,8 +337,7 @@ private:
         Panel description;
         description.name = words.word();
         description.construction = words.whole() != 0;
-        description.x = words.real();
-        description.y = words.real();
+        description.at = words.vec2();
         description.angle = words.real();
         if (!words.done()) description.particleDistance = words.particleDistance();  // older files have none
         DocumentAccess::restore(doc_, id, std::move(description));
@@ -349,9 +348,7 @@ private:
         if (!panel_) throw Problem{"an arrangement comes before any panel"};
         Arrangement in;
         in.placed = true;
-        in.x = words.real();
-        in.y = words.real();
-        in.z = words.real();
+        in.at = words.vec3();
         in.turn = words.real();
         in.tilt = words.real();
         in.roll = words.real();

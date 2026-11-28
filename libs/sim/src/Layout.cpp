@@ -34,12 +34,10 @@ Arrangement standingWhereTheTableHasIt(const Panel& panel, Vec2 centre) {
         const double times = std::floor((at - low) / (high - low));
         return std::pair{at - times * (high - low), std::abs(times)};
     };
-    const auto [x, roundsAcross] = wrapped(panel.x + onTable.x, -standingAcross, standingAcross);
-    const auto [y, roundsUp] = wrapped(panel.y + onTable.y, standingLowest, standingHighest);
+    const auto [x, roundsAcross] = wrapped(panel.at.x + onTable.x, -standingAcross, standingAcross);
+    const auto [y, roundsUp] = wrapped(panel.at.y + onTable.y, standingLowest, standingHighest);
     Arrangement standing;
-    standing.x = x;
-    standing.y = y;
-    standing.z = unarrangedDistance + standingStepForward * (roundsAcross + roundsUp);
+    standing.at = {x, y, unarrangedDistance + standingStepForward * (roundsAcross + roundsUp)};
     standing.roll = panel.angle;
     return standing;
 }
@@ -74,7 +72,7 @@ Arrangement mirrored(const Arrangement& arrangement) {
     // round; tilting, about the axis the mirror stands across, and wrapping,
     // which bends both sides back alike, do not change.
     Arrangement image = arrangement;
-    image.x = -arrangement.x;
+    image.at.x = -arrangement.at.x;
     image.turn = -arrangement.turn;
     image.roll = -arrangement.roll;
     if (image.anchor) image.anchor->x = -image.anchor->x;
@@ -174,20 +172,13 @@ Arrangement turnedAbout(const Arrangement& arrangement, Vec3 axis, double degree
 
 Arrangement turnedAbout(const Arrangement& arrangement, Vec3 axis, double degrees, Vec3 through) {
     Arrangement now = turnedAbout(arrangement, axis, degrees);
-    const Vec3 fromIt = Vec3{arrangement.x, arrangement.y, arrangement.z} - through;
-    const Vec3 anchor = through + Motion{.before = arrangement, .after = now}.turned(fromIt);
-    now.x = anchor.x;
-    now.y = anchor.y;
-    now.z = anchor.z;
+    now.at = through + Motion{.before = arrangement, .after = now}.turned(arrangement.at - through);
     return now;
 }
 
 Vec3 Motion::turned(Vec3 direction) const { return rotated(unrotated(direction, before), after); }
 
-Vec3 Motion::operator()(Vec3 point) const {
-    const Vec3 from{before.x, before.y, before.z}, to{after.x, after.y, after.z};
-    return turned(point - from) + to;
-}
+Vec3 Motion::operator()(Vec3 point) const { return turned(point - before.at) + after.at; }
 
 std::vector<Vec3> arrangedPanel(const Arrangement& in, const PanelMesh& mesh) {
     const Box box = boxOf(mesh);
@@ -211,7 +202,7 @@ std::vector<Vec3> arrangedPanel(const Arrangement& in, const PanelMesh& mesh) {
         p = {p.x * cr - p.y * sr, p.x * sr + p.y * cr, p.z};  // roll, in its own plane
         p = {p.x, p.y * ct - p.z * st, p.y * st + p.z * ct};  // tilt, about its horizontal axis
         p = {p.x * cy + p.z * sy, p.y, -p.x * sy + p.z * cy}; // turn, about the vertical
-        positions.push_back({p.x + in.x, p.y + in.y, p.z + in.z});
+        positions.push_back(p + in.at);
     }
     return positions;
 }

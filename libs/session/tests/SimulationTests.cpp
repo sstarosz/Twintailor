@@ -20,7 +20,7 @@ namespace {
 std::shared_ptr<const sim::ClothMesh> aSheet(Document& doc, double width = 30) {
     const PanelId panel = doc.add(Panel{.name = "sheet"});
     doc.add(panel, Rect{.width = Expr(width), .height = 30_cm});
-    doc.arrange(panel, Arrangement{.placed = true, .x = 0, .y = 100, .z = 0});
+    doc.arrange(panel, Arrangement{.placed = true, .at = {0, 100, 0}});
     return std::make_shared<const sim::ClothMesh>(sim::meshOf(doc, evaluate(doc), {.particleDistance = 3_cm}));
 }
 

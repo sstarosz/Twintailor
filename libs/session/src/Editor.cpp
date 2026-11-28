@@ -43,14 +43,13 @@ void keepSeamsInPlace(Document& doc, const Result& before, const Result& after, 
         const Vec2 to = sim::anchorAfterChange(doc, now.panel, was->pattern, now.pattern, from);
         if (to == from) continue;  // its outline did not move under it
         // On the table: the spot that stays is drawn where it was.
-        const Vec2 by = turned(Vec2{to.x - from.x, to.y - from.y}, panel.angle);
-        const double x = panel.x - by.x, y = panel.y - by.y;
+        const Vec2 at = panel.at - turned(to - from, panel.angle);
         if (panel.arrangement.placed) {
             Arrangement moved = panel.arrangement;
             moved.anchor = to;
             doc.arrange(now.panel, moved);
         }
-        doc.place(now.panel, x, y);
+        doc.place(now.panel, at);
     }
 }
 

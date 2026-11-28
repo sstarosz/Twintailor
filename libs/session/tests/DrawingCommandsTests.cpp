@@ -54,7 +54,7 @@ TEST_CASE("a new panel is added with its starting shape and the first free name 
     const Document& doc = editor.document();
     EXPECT((doc.get(first->panel).name == "panel1" && doc.get(second->panel).name == "panel2" && doc.get(round->panel).name == "circle1"), "numbered by kind");
     EXPECT((doc.get(skirt->panel).name == "flounce"), "or named as asked");
-    EXPECT((doc.get(first->panel).x == 5.0 && editor.shapes()[first->panel].length(OpRef<Rect>(first->shape).bottom()) == 20.0), "where and as big as asked");
+    EXPECT((doc.get(first->panel).at.x == 5.0 && editor.shapes()[first->panel].length(OpRef<Rect>(first->shape).bottom()) == 20.0), "where and as big as asked");
     EXPECT((editor.undo() && editor.document().panels().size() == 3), "each is one undo step");
 }
 
@@ -98,7 +98,7 @@ TEST_CASE("a curve's handle is moved by as much on the table; the preview of a d
 TEST_CASE("a corner is added on the drawn side of a symmetric panel; it says when it splits a seam")
 {
     Half half;
-    const PanelId other = half.doc.add(Panel{.name = "other", .x = 40});
+    const PanelId other = half.doc.add(Panel{.name = "other", .at = {40, 0}});
     const OpRef<Rect> otherRect = half.doc.add(other, Rect{.width = 10_cm, .height = 20_cm});
     half.doc.add(Seam{.a = {half.panel, half.rect.right()}, .b = {other, otherRect.left()}});
     Editor editor(half.doc);

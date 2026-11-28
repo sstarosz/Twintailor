@@ -265,7 +265,7 @@ std::optional<Gizmo> gizmoOf(const session::Session& session, PanelId panel, Giz
     const sim::PanelMesh* mesh = session.mesh()->find(panel);
     if (!mesh) return std::nullopt;
     const Arrangement place = sim::arrangementOf(session.document(), *mesh);
-    Vec3 centre{place.x, place.y, place.z};
+    Vec3 centre = place.at;
     // Cloth hangs away from where it is arranged: then the gizmo stands on it,
     // at the particle that is nearest the anchor in the flat pattern.
     if (session.clothShown()) {

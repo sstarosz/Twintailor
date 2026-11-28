@@ -26,7 +26,7 @@ TEST_CASE("a dropped cloth comes to rest on the floor")
     Document doc;
     PanelId panel = doc.add(Panel{.name = "cloth"});
     doc.add(panel, Rect{.width = 40_cm, .height = 40_cm});
-    doc.arrange(panel, Arrangement{.placed = true, .x = 0, .y = 30, .z = 0, .tilt = 80});  // nearly lying down, 30 cm up
+    doc.arrange(panel, Arrangement{.placed = true, .at = {0, 30, 0}, .tilt = 80});  // nearly lying down, 30 cm up
     const ClothMesh mesh = meshOf(doc, evaluate(doc), {.particleDistance = 2_cm});
     Cloth cloth(mesh, arranged(doc, mesh));
     const Body nobody;
@@ -51,7 +51,7 @@ TEST_CASE("a pinned cloth hangs")
     Document doc;
     PanelId panel = doc.add(Panel{.name = "flag"});
     OpRef<Rect> rect = doc.add(panel, Rect{.width = 30_cm, .height = 50_cm});
-    doc.arrange(panel, Arrangement{.placed = true, .x = 0, .y = 150, .z = 0, .tilt = 60});  // held out at an angle
+    doc.arrange(panel, Arrangement{.placed = true, .at = {0, 150, 0}, .tilt = 60});  // held out at an angle
     const ClothMesh mesh = meshOf(doc, evaluate(doc), {.particleDistance = 2_cm});
     const Placement start = arranged(doc, mesh);
     Cloth cloth(mesh, start);
@@ -78,8 +78,8 @@ TEST_CASE("seams pull panels together")
     OpRef<Rect> backRect = doc.add(back, Rect{.width = 20_cm, .height = 30_cm});
     doc.add(Seam{.a = {front, frontRect.right()}, .b = {back, backRect.left()}});
     doc.add(Seam{.a = {front, frontRect.left()}, .b = {back, backRect.right()}});
-    doc.arrange(front, Arrangement{.placed = true, .x = 0, .y = 100, .z = 10});
-    doc.arrange(back, Arrangement{.placed = true, .x = 0, .y = 100, .z = -10, .turn = 180});
+    doc.arrange(front, Arrangement{.placed = true, .at = {0, 100, 10}});
+    doc.arrange(back, Arrangement{.placed = true, .at = {0, 100, -10}, .turn = 180});
     const ClothMesh mesh = meshOf(doc, evaluate(doc), {.particleDistance = 2_cm});
     Cloth cloth(mesh, arranged(doc, mesh));
     cloth.pin(0, mesh.panels[0].along(frontRect.top())->points.back());   // hold the front up by its two top corners
@@ -116,10 +116,10 @@ TEST_CASE("a seam that cannot close is reported as left open, with how far apart
     const OpRef<Rect> rightRect = doc.add(right, Rect{.width = 20_cm, .height = 30_cm});
     const SeamId held = doc.add(Seam{.a = {front, frontRect.right()}, .b = {back, backRect.left()}});
     doc.add(Seam{.a = {left, leftRect.right()}, .b = {right, rightRect.left()}});
-    doc.arrange(front, Arrangement{.placed = true, .x = 0, .y = 100, .z = 10});
-    doc.arrange(back, Arrangement{.placed = true, .x = 0, .y = 100, .z = -10, .turn = 180});
-    doc.arrange(left, Arrangement{.placed = true, .x = 90, .y = 100, .z = 0});
-    doc.arrange(right, Arrangement{.placed = true, .x = 112, .y = 100, .z = 0});
+    doc.arrange(front, Arrangement{.placed = true, .at = {0, 100, 10}});
+    doc.arrange(back, Arrangement{.placed = true, .at = {0, 100, -10}, .turn = 180});
+    doc.arrange(left, Arrangement{.placed = true, .at = {90, 100, 0}});
+    doc.arrange(right, Arrangement{.placed = true, .at = {112, 100, 0}});
     const ClothMesh mesh = meshOf(doc, evaluate(doc), {.particleDistance = 2_cm});
     Cloth cloth(mesh, arranged(doc, mesh));
     for (const uint32_t panel : {0u, 1u})
@@ -152,8 +152,8 @@ TEST_CASE("a seam left open is no longer reported once it closes")
     const PanelId back = doc.add(Panel{.name = "back"});
     const OpRef<Rect> backRect = doc.add(back, Rect{.width = 20_cm, .height = 30_cm});
     const SeamId seam = doc.add(Seam{.a = {front, frontRect.right()}, .b = {back, backRect.left()}});
-    doc.arrange(front, Arrangement{.placed = true, .x = 0, .y = 30, .z = 5});
-    doc.arrange(back, Arrangement{.placed = true, .x = 0, .y = 30, .z = -5, .turn = 180});
+    doc.arrange(front, Arrangement{.placed = true, .at = {0, 30, 5}});
+    doc.arrange(back, Arrangement{.placed = true, .at = {0, 30, -5}, .turn = 180});
     const ClothMesh mesh = meshOf(doc, evaluate(doc), {.particleDistance = 2_cm});
     Cloth cloth(mesh, arranged(doc, mesh));
     // One stitched point held under the floor, where the one sewn to it cannot follow.
@@ -174,7 +174,7 @@ TEST_CASE("cloth rests on a body")
     Document doc;
     PanelId panel = doc.add(Panel{.name = "cloth"});
     doc.add(panel, Rect{.width = 50_cm, .height = 50_cm});
-    doc.arrange(panel, Arrangement{.placed = true, .x = 0, .y = 80, .z = 0, .tilt = 90});  // lying flat, above the ball
+    doc.arrange(panel, Arrangement{.placed = true, .at = {0, 80, 0}, .tilt = 90});  // lying flat, above the ball
     const ClothMesh mesh = meshOf(doc, evaluate(doc), {.particleDistance = 2_cm});
     Body ball;
     ball.parts.push_back({{0, 50, 0}, {0, 50, 0}, 15, 15});
@@ -201,7 +201,7 @@ TEST_CASE("cloth stays draped when the pattern changes")
     Document doc;
     PanelId panel = doc.add(Panel{.name = "cloth"});
     OpRef<Rect> rect = doc.add(panel, Rect{.width = 50_cm, .height = 50_cm});
-    doc.arrange(panel, Arrangement{.placed = true, .x = 0, .y = 80, .z = 0, .tilt = 90});
+    doc.arrange(panel, Arrangement{.placed = true, .at = {0, 80, 0}, .tilt = 90});
     Body ball;
     ball.parts.push_back({{0, 50, 0}, {0, 50, 0}, 15, 15});
     const ClothMesh mesh = meshOf(doc, evaluate(doc), {.particleDistance = 2_cm});
@@ -250,7 +250,7 @@ TEST_CASE("cloth stays draped when the pattern changes")
     // A second panel added later starts where it is arranged; the first stays draped.
     PanelId extra = doc.add(Panel{.name = "extra"});
     doc.add(extra, Rect{.width = 10_cm, .height = 10_cm});
-    doc.arrange(extra, Arrangement{.placed = true, .x = 80, .y = 120, .z = 0});
+    doc.arrange(extra, Arrangement{.placed = true, .at = {80, 120, 0}});
     const ClothMesh two = meshOf(doc, evaluate(doc), {.particleDistance = 2_cm});
     Cloth withExtra = Cloth::continued(two, arranged(doc, two), carried, wider);
     EXPECT((std::abs(heights(withExtra, 1).second - 125.0) < 1e-9), "a new panel starts where it is arranged");
@@ -259,7 +259,7 @@ TEST_CASE("cloth stays draped when the pattern changes")
     // goes as a whole, drape and all; nothing starts again.
     const Arrangement was = doc.get(panel).arrangement;
     Arrangement now = was;
-    now.y += 30.0;
+    now.at.y += 30.0;
     now.turn += 90.0;
     const Motion motion{.before = was, .after = now};
     Cloth carriedOff = Cloth::continued(two, arranged(doc, two), withExtra, two, {Moved{panel, motion}});
@@ -277,7 +277,7 @@ TEST_CASE("a change of wrap bends the cloth as it bends the panel, keeping how f
     Document doc;
     const PanelId panel = doc.add(Panel{.name = "panel"});
     doc.add(panel, Rect{.width = 40_cm, .height = 30_cm});
-    doc.arrange(panel, Arrangement{.placed = true, .x = 0, .y = 120, .z = 20, .turn = 20, .wrap = 60});
+    doc.arrange(panel, Arrangement{.placed = true, .at = {0, 120, 20}, .turn = 20, .wrap = 60});
     const ClothMesh mesh = meshOf(doc, evaluate(doc), {.particleDistance = 2_cm});
     const Placement flat = arranged(doc, mesh);
     const Cloth fresh(mesh, flat);
@@ -286,7 +286,7 @@ TEST_CASE("a change of wrap bends the cloth as it bends the panel, keeping how f
     const Arrangement was = doc.get(panel).arrangement;
     Arrangement now = was;
     now.wrap = 180.0;
-    now.y += 15.0;
+    now.at.y += 15.0;
     now.turn += 70.0;
     doc.arrange(panel, now);
     const Placement bent = arranged(doc, mesh);
@@ -312,7 +312,7 @@ TEST_CASE("a held particle is led by the hand and the cloth follows it")
     Document doc;
     const PanelId panel = doc.add(Panel{.name = "cloth"});
     doc.add(panel, Rect{.width = 30_cm, .height = 30_cm});
-    doc.arrange(panel, Arrangement{.placed = true, .x = 0, .y = 5, .z = 0, .tilt = 90});  // lying flat, just above the floor
+    doc.arrange(panel, Arrangement{.placed = true, .at = {0, 5, 0}, .tilt = 90});  // lying flat, just above the floor
     const ClothMesh mesh = meshOf(doc, evaluate(doc), {.particleDistance = 2_cm});
     Cloth cloth(mesh, arranged(doc, mesh));
     const Body nobody;
@@ -349,8 +349,8 @@ TEST_CASE("cloth does not pass through cloth")
     doc.add(lower, Rect{.width = 40_cm, .height = 40_cm});
     PanelId upper = doc.add(Panel{.name = "upper"});
     doc.add(upper, Rect{.width = 25_cm, .height = 25_cm});
-    doc.arrange(lower, Arrangement{.placed = true, .x = 0, .y = 20, .z = 0, .tilt = 90});
-    doc.arrange(upper, Arrangement{.placed = true, .x = 3.3, .y = 30, .z = 2.7, .tilt = 90, .roll = 20});
+    doc.arrange(lower, Arrangement{.placed = true, .at = {0, 20, 0}, .tilt = 90});
+    doc.arrange(upper, Arrangement{.placed = true, .at = {3.3, 30, 2.7}, .tilt = 90, .roll = 20});
     const ClothMesh mesh = meshOf(doc, evaluate(doc), {.particleDistance = 2_cm});
     const auto settle = [&](bool collides) {
         Fabric fabric;
@@ -384,7 +384,7 @@ TEST_CASE("cloth does not pass through cloth")
     PanelId sheet = fold.add(Panel{.name = "sheet"});
     OpRef<Rect> rect = fold.add(sheet, Rect{.width = 40_cm, .height = 20_cm});
     fold.add(Seam{.a = {sheet, rect.left()}, .b = {sheet, rect.right()}, .reversed = true});  // left edge onto right edge, same way up: a flat loop
-    fold.arrange(sheet, Arrangement{.placed = true, .x = 0, .y = 15, .z = 0, .tilt = 90});
+    fold.arrange(sheet, Arrangement{.placed = true, .at = {0, 15, 0}, .tilt = 90});
     const ClothMesh loop = meshOf(fold, evaluate(fold), {.particleDistance = 2_cm});
     Cloth folded(loop, arranged(fold, loop));
     run(folded, Body{}, 4.0);
@@ -411,8 +411,8 @@ TEST_CASE("a panel left out stays where it is and nothing touches it; taken back
     doc.add(lower, Rect{.width = 40_cm, .height = 40_cm});
     const PanelId upper = doc.add(Panel{.name = "upper"});
     doc.add(upper, Rect{.width = 25_cm, .height = 25_cm});
-    doc.arrange(lower, Arrangement{.placed = true, .x = 0, .y = 20, .z = 0, .tilt = 90});
-    doc.arrange(upper, Arrangement{.placed = true, .x = 0, .y = 30, .z = 0, .tilt = 90});
+    doc.arrange(lower, Arrangement{.placed = true, .at = {0, 20, 0}, .tilt = 90});
+    doc.arrange(upper, Arrangement{.placed = true, .at = {0, 30, 0}, .tilt = 90});
     const ClothMesh mesh = meshOf(doc, evaluate(doc), {.particleDistance = 2_cm});
     const Placement start = arranged(doc, mesh);
     Cloth cloth(mesh, start);
@@ -438,8 +438,8 @@ TEST_CASE("the seams of a panel left out hold nothing, and are drawn closed when
     const OpRef<Rect> leftRect = doc.add(left, Rect{.width = 20_cm, .height = 30_cm});
     const PanelId right = doc.add(Panel{.name = "right"});
     const OpRef<Rect> rightRect = doc.add(right, Rect{.width = 20_cm, .height = 30_cm});
-    doc.arrange(left, Arrangement{.placed = true, .x = -25, .y = 150, .z = 0});
-    doc.arrange(right, Arrangement{.placed = true, .x = 25, .y = 150, .z = 0});
+    doc.arrange(left, Arrangement{.placed = true, .at = {-25, 150, 0}});
+    doc.arrange(right, Arrangement{.placed = true, .at = {25, 150, 0}});
     doc.add(Seam{.a = {left, leftRect.right()}, .b = {right, rightRect.left()}});
     const ClothMesh mesh = meshOf(doc, evaluate(doc), {.particleDistance = 2_cm});
     const Placement start = arranged(doc, mesh);

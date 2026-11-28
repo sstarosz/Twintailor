@@ -207,7 +207,7 @@ TEST_CASE("unknown handles throw")
     EXPECT_THROWS([&] { (void)doc.get(panel); }, std::out_of_range, "get removed panel");
     EXPECT_THROWS([&] { doc.add(panel, Rect{}); }, std::out_of_range, "add to removed panel");
     EXPECT_THROWS([&] { doc.rename(panel, "again"); }, std::out_of_range, "rename removed panel");
-    EXPECT_THROWS([&] { doc.place(panel, 1, 2); }, std::out_of_range, "place removed panel");
+    EXPECT_THROWS([&] { doc.place(panel, {1, 2}); }, std::out_of_range, "place removed panel");
     EXPECT_THROWS([&] { doc.remove(panel); }, std::out_of_range, "remove removed panel");
     EXPECT_THROWS([&] { (void)doc.copy(panel, Panel{}); }, std::out_of_range, "copy removed panel");
     EXPECT_THROWS([&] { (void)doc.operations(panel); }, std::out_of_range, "operations of removed panel");

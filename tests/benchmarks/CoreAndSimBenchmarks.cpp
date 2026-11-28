@@ -34,8 +34,8 @@ static Document skirt() {
     const OpRef<Rect> backRect = doc.add(back, Rect{.width = waist / 2, .height = 80_cm});
     doc.add(Seam{.a = {front, frontRect.right()}, .b = {back, backRect.left()}});
     doc.add(Seam{.a = {front, frontRect.left()}, .b = {back, backRect.right()}});
-    doc.arrange(front, Arrangement{.placed = true, .x = 0, .y = 90, .z = 26, .wrap = 100});
-    doc.arrange(back, Arrangement{.placed = true, .x = 0, .y = 90, .z = -26, .turn = 180, .wrap = 100});
+    doc.arrange(front, Arrangement{.placed = true, .at = {0, 90, 26}, .wrap = 100});
+    doc.arrange(back, Arrangement{.placed = true, .at = {0, 90, -26}, .turn = 180, .wrap = 100});
     return doc;
 }
 

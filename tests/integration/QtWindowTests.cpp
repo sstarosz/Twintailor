@@ -357,7 +357,7 @@ TEST_CASE("placement is typed in space; the views can be laid out", "[qt]")
     const PanelId front = w.panel("front");
     w.window.select(front);
     type(w.window.attributes()->spaceField(session::SpaceField::Y), "120");
-    EXPECT((w.doc().get(front).arrangement.y == 120.0), "y in space is typed in cm");
+    EXPECT((w.doc().get(front).arrangement.at.y == 120.0), "y in space is typed in cm");
     type(w.window.attributes()->spaceField(session::SpaceField::Wrap), "160");
     EXPECT((w.doc().get(front).arrangement.wrap == 160.0), "wrap in degrees");
 
@@ -420,12 +420,12 @@ struct Table : Window {
         for (const Vertex& v : shape.vertices)
             if (const double along = v.position.x * x + v.position.y * y; along > most) most = along, best = v.position;
         const Vec2 on = turned(best, placed.angle);
-        return {on.x + placed.x, on.y + placed.y};
+        return on + placed.at;
     }
     Vec2 middle(PanelId panel) const {
         const std::optional<Bounds> box = bounds(window.session().editor().shapes()[panel]);
         const Panel& placed = doc().get(panel);
-        return {placed.x + (box->min.x + box->max.x) / 2, placed.y + (box->min.y + box->max.y) / 2};
+        return {placed.at.x + (box->min.x + box->max.x) / 2, placed.at.y + (box->min.y + box->max.y) / 2};
     }
     double width(PanelId panel) const {
         const std::optional<Bounds> box = bounds(window.session().editor().shapes()[panel]);
@@ -462,16 +462,16 @@ TEST_CASE("a panel is dragged on the table as one undo step; Ctrl puts it on the
     const QPointF at = w.table()->toScreen(w.middle(plain));
     drag(w.table(), at, by(at, w.table(), 12, -4));
     EXPECT((w.window.selected() == plain), "pressing a panel selects it");
-    EXPECT((std::abs(w.doc().get(plain).x - (was.x + 12)) < 0.2 && std::abs(w.doc().get(plain).y - (was.y - 4)) < 0.2), "it moves with the pointer");
+    EXPECT((std::abs(w.doc().get(plain).at.x - (was.at.x + 12)) < 0.2 && std::abs(w.doc().get(plain).at.y - (was.at.y - 4)) < 0.2), "it moves with the pointer");
     EXPECT((w.width(plain) == 30.0), "placement is not shape");
     w.window.shelf()->undo()->trigger();
-    EXPECT((w.doc().get(plain).x == was.x && w.doc().get(plain).y == was.y), "one undo puts it back");
+    EXPECT((w.doc().get(plain).at.x == was.at.x && w.doc().get(plain).at.y == was.at.y), "one undo puts it back");
 
     drag(w.table(), at, by(at, w.table(), 7.3, 2.1), Qt::ControlModifier);
     // The grid's step at this zoom, as the table draws it.
     double step = 0.1;
     while (step * w.table()->scale() < 12.0) step *= 10.0;
-    const double x = w.doc().get(plain).x, y = w.doc().get(plain).y;
+    const double x = w.doc().get(plain).at.x, y = w.doc().get(plain).at.y;
     EXPECT((std::abs(x / step - std::round(x / step)) < 1e-6 && std::abs(y / step - std::round(y / step)) < 1e-6), "Ctrl puts its place on the grid");
 
     click(w.table(), w.table()->toScreen({-1000, -1000}));
@@ -686,21 +686,21 @@ TEST_CASE("Shift held while a panel is dragged keeps it on the axis it first mov
 
     // The hand drifts upwards as well, but the panel only goes sideways.
     drag(table, at, by(at, table, 12, 2.5), Qt::ShiftModifier);
-    EXPECT((std::abs(w.doc().get(plain).x - (was.x + 12)) < 0.2), "the panel followed the pointer along x");
-    EXPECT((w.doc().get(plain).y == was.y), "and its y did not change at all");
+    EXPECT((std::abs(w.doc().get(plain).at.x - (was.at.x + 12)) < 0.2), "the panel followed the pointer along x");
+    EXPECT((w.doc().get(plain).at.y == was.at.y), "and its y did not change at all");
     EXPECT((w.window.selected() == plain), "it is still selected: Shift on a selected panel is not a click");
     w.window.shelf()->undo()->trigger();
-    EXPECT((w.doc().get(plain).x == was.x), "one undo puts it back");
+    EXPECT((w.doc().get(plain).at.x == was.at.x), "one undo puts it back");
 
     drag(table, at, by(at, table, 2, -9), Qt::ShiftModifier);
-    EXPECT((w.doc().get(plain).x == was.x && std::abs(w.doc().get(plain).y - (was.y - 9)) < 0.2), "dragged mostly down, it only goes down");
+    EXPECT((w.doc().get(plain).at.x == was.at.x && std::abs(w.doc().get(plain).at.y - (was.at.y - 9)) < 0.2), "dragged mostly down, it only goes down");
     w.window.shelf()->undo()->trigger();
 
     drag(table, at, by(at, table, 7.3, 2.1), Qt::ShiftModifier | Qt::ControlModifier);
     double step = 0.1;
     while (step * table->scale() < 12.0) step *= 10.0;
-    const double x = w.doc().get(plain).x;
-    EXPECT((std::abs(x / step - std::round(x / step)) < 1e-6 && w.doc().get(plain).y == was.y), "with Ctrl as well, x is on the grid and y stays");
+    const double x = w.doc().get(plain).at.x;
+    EXPECT((std::abs(x / step - std::round(x / step)) < 1e-6 && w.doc().get(plain).at.y == was.at.y), "with Ctrl as well, x is on the grid and y stays");
     w.window.shelf()->undo()->trigger();
 
     // The gizmo goes with the panel while it is dragged, not only when the button is let go.
@@ -733,7 +733,7 @@ TEST_CASE("Shift held while a panel is dragged keeps it on the axis it first mov
     REQUIRE(table->gizmo());
     const QPointF middle = table->toScreen(table->gizmo()->centre);
     drag(table, middle, by(middle, table, 3, 9), Qt::ShiftModifier);
-    EXPECT((w.doc().get(plain).x == was.x && std::abs(w.doc().get(plain).y - (was.y + 9)) < 0.2), "the gizmo's middle goes up only");
+    EXPECT((w.doc().get(plain).at.x == was.at.x && std::abs(w.doc().get(plain).at.y - (was.at.y + 9)) < 0.2), "the gizmo's middle goes up only");
 }
 
 TEST_CASE("on the table the move gizmo's arrow moves a panel along x only, its ring turns it, its handle scales it", "[qt]")
@@ -748,10 +748,10 @@ TEST_CASE("on the table the move gizmo's arrow moves a panel along x only, its r
     const Panel was = w.doc().get(plain);
     const QPointF onArrow = table->toScreen(session::handleEnd(*table->gizmo(), session::TableHandle::AlongX)) - QPointF(25.0, 0.0);
     drag(table, onArrow, onArrow + QPointF(40.0, -30.0));
-    EXPECT((std::abs(w.doc().get(plain).x - (was.x + 40.0 / table->scale())) < 0.06), "the x arrow moves the panel along x");
-    EXPECT((w.doc().get(plain).y == was.y), "and not along y");
+    EXPECT((std::abs(w.doc().get(plain).at.x - (was.at.x + 40.0 / table->scale())) < 0.06), "the x arrow moves the panel along x");
+    EXPECT((w.doc().get(plain).at.y == was.at.y), "and not along y");
     w.window.shelf()->undo()->trigger();
-    EXPECT((w.doc().get(plain).x == was.x), "the drag is one step to undo");
+    EXPECT((w.doc().get(plain).at.x == was.at.x), "the drag is one step to undo");
 
     // A quarter turn, from the ring's right to its top, in steps of 15° with Ctrl.
     choose(w, Tool::Rotate);
@@ -763,7 +763,7 @@ TEST_CASE("on the table the move gizmo's arrow moves a panel along x only, its r
     const Vec2 turnedMiddle = [&] {
         const std::optional<Bounds> box = bounds(w.window.session().editor().shapes()[plain]);
         const Vec2 own = turned(Vec2{(box->min.x + box->max.x) / 2, (box->min.y + box->max.y) / 2}, w.doc().get(plain).angle);
-        return Vec2{w.doc().get(plain).x + own.x, w.doc().get(plain).y + own.y};
+        return w.doc().get(plain).at + own;
     }();
     EXPECT((std::abs(turnedMiddle.x - middle.x) < 1e-6 && std::abs(turnedMiddle.y - middle.y) < 1e-6), "about its middle, which stays where it was");
     EXPECT((w.width(plain) == 30.0), "turning is not shape");
@@ -787,7 +787,7 @@ TEST_CASE("on the table the move gizmo's arrow moves a panel along x only, its r
     EXPECT((std::abs(w.width(plain) - 45.0) < 1e-6), "the panel is half as wide again");
     const std::optional<Bounds> scaledBox = bounds(w.window.session().editor().shapes()[plain]);
     const Vec2 scaledMiddle = turned(Vec2{(scaledBox->min.x + scaledBox->max.x) / 2, (scaledBox->min.y + scaledBox->max.y) / 2}, w.doc().get(plain).angle);
-    EXPECT((std::abs(w.doc().get(plain).x + scaledMiddle.x - middle.x) < 1e-6 && std::abs(w.doc().get(plain).y + scaledMiddle.y - middle.y) < 1e-6),
+    EXPECT((std::abs(w.doc().get(plain).at.x + scaledMiddle.x - middle.x) < 1e-6 && std::abs(w.doc().get(plain).at.y + scaledMiddle.y - middle.y) < 1e-6),
            "scaled about its middle, which stays where it was");
     w.window.shelf()->undo()->trigger();
     EXPECT((w.doc().operations(plain).size() == layers && w.width(plain) == 30.0), "undo takes the layer away");
@@ -1182,7 +1182,7 @@ TEST_CASE("a longer length moves the end that is not kept, not the whole drawing
     // Where a corner is on the table: the panel's place and the corner in the panel.
     const auto onTable = [&](const CornerRef& corner) {
         const Vec2 at = w.window.session().editor().shapes()[plain].position(corner);
-        return Vec2{w.doc().get(plain).x + at.x, w.doc().get(plain).y + at.y};
+        return w.doc().get(plain).at + at;
     };
     const Vec2 leftWas = onTable(rect.bottomLeft()), rightWas = onTable(rect.bottomRight());
     const Vec2 a = w.corner(plain, -1, -1), b = w.corner(plain, 1, -1);
@@ -1218,7 +1218,7 @@ TEST_CASE("a length typed for a sewn panel grows it away from its seam; a new do
         Document doc;
         const PanelId a = doc.add(Panel{.name = "A"});
         const OpRef<Rect> ra = doc.add(a, Rect{.width = 30_cm, .height = 10_cm});
-        const PanelId b = doc.add(Panel{.name = "B", .x = 40});
+        const PanelId b = doc.add(Panel{.name = "B", .at = {40, 0}});
         const OpRef<Rect> rb = doc.add(b, Rect{.width = 30_cm, .height = 10_cm});
         doc.add(Seam{.a = {a, ra.right()}, .b = {b, rb.left()}});
         w.window.open(std::move(doc), "sewn");
@@ -1232,7 +1232,7 @@ TEST_CASE("a length typed for a sewn panel grows it away from its seam; a new do
     const auto sewnMiddle = [&] {
         const Pattern& shape = w.window.session().editor().shapes()[a];
         const Vec2 low = shape.position(ra.bottomRight()), high = shape.position(ra.topRight());
-        return Vec2{w.doc().get(a).x + (low.x + high.x) / 2.0, w.doc().get(a).y + (low.y + high.y) / 2.0};
+        return Vec2{w.doc().get(a).at.x + (low.x + high.x) / 2.0, w.doc().get(a).at.y + (low.y + high.y) / 2.0};
     };
     const Vec2 before = sewnMiddle();
     const Vec2 left = w.corner(a, -1, 3), right = w.corner(a, 1, 3);  // the top edge
@@ -1392,9 +1392,9 @@ TEST_CASE("a click in the 3D view selects the panel under it; its gizmo carries 
     // The panel nearest the camera, which looks at the body from the front.
     PanelId front = w.doc().panels().front();
     for (PanelId p : w.doc().panels())
-        if (w.doc().get(p).arrangement.z > w.doc().get(front).arrangement.z) front = p;
+        if (w.doc().get(p).arrangement.at.z > w.doc().get(front).arrangement.at.z) front = p;
     const Arrangement before = w.doc().get(front).arrangement;
-    const Vec3 centre{before.x, before.y, before.z};
+    const Vec3 centre = before.at;
     const std::optional<render::PicturePoint> middle = render::pictureOf(space.camera(), space.pictureSize(), centre);
     REQUIRE(middle.has_value());
 
@@ -1421,14 +1421,14 @@ TEST_CASE("a click in the 3D view selects the panel under it; its gizmo carries 
     space.release();
     w.window.tick();
     const Arrangement after = w.doc().get(front).arrangement;
-    EXPECT((after.x > before.x + 1.0), "pulling the x arrow moves the panel along x");
-    EXPECT((after.y == before.y && after.z == before.z), "and not along y or z");
+    EXPECT((after.at.x > before.at.x + 1.0), "pulling the x arrow moves the panel along x");
+    EXPECT((after.at.y == before.at.y && after.at.z == before.at.z), "and not along y or z");
     EXPECT((w.window.selected() == front), "the panel stays selected");
     EXPECT((space.camera().yaw == yaw), "the camera stays where it was");
 
     w.window.shelf()->undo()->trigger();
     w.window.tick();
-    EXPECT((w.doc().get(front).arrangement.x == before.x), "the whole drag is one step to undo");
+    EXPECT((w.doc().get(front).arrangement.at.x == before.at.x), "the whole drag is one step to undo");
 
     click(space, {2.0, 2.0});
     w.window.tick();
@@ -1443,9 +1443,9 @@ std::pair<PanelId, render::PicturePoint> frontPanel(const Window& w) {
     const SpaceView& space = *w.window.space();
     PanelId front = w.doc().panels().front();
     for (PanelId p : w.doc().panels())
-        if (w.doc().get(p).arrangement.z > w.doc().get(front).arrangement.z) front = p;
-    const Arrangement& at = w.doc().get(front).arrangement;
-    const std::optional<render::PicturePoint> middle = render::pictureOf(space.camera(), space.pictureSize(), {at.x, at.y, at.z});
+        if (w.doc().get(p).arrangement.at.z > w.doc().get(front).arrangement.at.z) front = p;
+    const Vec3 at = w.doc().get(front).arrangement.at;
+    const std::optional<render::PicturePoint> middle = render::pictureOf(space.camera(), space.pictureSize(), at);
     REQUIRE(middle.has_value());
     return {front, *middle};
 }
@@ -1488,10 +1488,10 @@ TEST_CASE("in 3D the rotate gizmo turns the selected panel in space; the scale g
     w.window.tick();
     const Arrangement after = w.doc().get(front).arrangement;
     // The line of sight through the panel's anchor, from it to the eye.
-    const Vec3 sight = normalized(space.camera().eye() - Vec3{before.x, before.y, before.z});
+    const Vec3 sight = normalized(space.camera().eye() - before.at);
     const Vec3 expected = sim::inSpace(sim::turnedAbout(before, sight, -90.0), {1.0, 0.0, 0.0});
     EXPECT((length(sim::inSpace(after, {1.0, 0.0, 0.0}) - expected) < 1e-6), "the panel turns a quarter about the line of sight");
-    EXPECT((after.x == before.x && after.y == before.y && after.z == before.z), "about its anchor, which stays where it is");
+    EXPECT((after.at.x == before.at.x && after.at.y == before.at.y && after.at.z == before.at.z), "about its anchor, which stays where it is");
     w.window.shelf()->undo()->trigger();
     w.window.tick();
     EXPECT((w.doc().get(front).arrangement == before), "the whole drag is one step to undo");
@@ -1508,7 +1508,7 @@ TEST_CASE("in 3D the rotate gizmo turns the selected panel in space; the scale g
     w.window.tick();
     const Arrangement rolled = w.doc().get(front).arrangement;
     EXPECT((std::abs(rolled.turn - before.turn) > 20.0), "dragged 60 pixels to the right, the panel turns about the vertical, freely");
-    EXPECT((rolled.x == before.x && rolled.y == before.y && rolled.z == before.z), "about its anchor");
+    EXPECT((rolled.at.x == before.at.x && rolled.at.y == before.at.y && rolled.at.z == before.at.z), "about its anchor");
     w.window.shelf()->undo()->trigger();
     w.window.tick();
 
@@ -1536,7 +1536,7 @@ TEST_CASE("in 3D the rotate gizmo turns the selected panel in space; the scale g
         if (const Scale* s = std::get_if<Scale>(&w.doc().get(op))) added = s;
     REQUIRE(added != nullptr);
     EXPECT((std::abs(*asNumber(added->x) - 1.5) < 0.03 && asNumber(added->y) == 1.0), "a Scale layer of about 150 % along the panel's own x");
-    EXPECT((w.doc().get(front).arrangement.x == before.x), "scaling is shape: the panel's place stays");
+    EXPECT((w.doc().get(front).arrangement.at.x == before.at.x), "scaling is shape: the panel's place stays");
 }
 
 TEST_CASE("in 3D the selected panel is carried by dragging it; draped cloth is pulled instead", "[qt]")
@@ -1559,7 +1559,7 @@ TEST_CASE("in 3D the selected panel is carried by dragging it; draped cloth is p
     dragBy(w, onPanel, {40.0, 0.0});
     space.release();
     w.window.tick();
-    EXPECT((w.doc().get(front).arrangement.x != before.x), "with Move, dragging the selected panel carries it");
+    EXPECT((w.doc().get(front).arrangement.at.x != before.at.x), "with Move, dragging the selected panel carries it");
     EXPECT((w.window.selected() == front), "and it stays selected");
 
     // Drape it, then drag the playing cloth: the cloth is held, the document stays.
@@ -1640,7 +1640,7 @@ TEST_CASE("with the cloth paused a drag in 3D selects or carries; it is pulled w
     drag();
     const Arrangement after = w.doc().get(front).arrangement;
     EXPECT((!held && !session.simulating() && session.cloth().time == time), "with Move the cloth stays paused too");
-    EXPECT((after.x > before.x + 1.0 && after.y > before.y), "and the panel moved in space as it was dragged, right and up");
+    EXPECT((after.at.x > before.at.x + 1.0 && after.at.y > before.at.y), "and the panel moved in space as it was dragged, right and up");
     EXPECT((moved(positions) > 1.0), "its drape went with it");
     w.window.shelf()->undo()->trigger();
     w.window.tick();
@@ -1696,7 +1696,7 @@ TEST_CASE("with the cloth paused a drag in 3D selects or carries; it is pulled w
     w.window.tick();
     time = session.cloth().time;
     drag();
-    EXPECT((w.doc().get(back).arrangement.x > backBefore.x + 1.0 && !held && session.cloth().time == time), "through a see-through body Move carries the paused panel behind it");
+    EXPECT((w.doc().get(back).arrangement.at.x > backBefore.at.x + 1.0 && !held && session.cloth().time == time), "through a see-through body Move carries the paused panel behind it");
     w.window.shelf()->undo()->trigger();
     w.window.shelf()->action(Tool::Pull)->trigger();
     w.window.tick();
@@ -1766,7 +1766,7 @@ TEST_CASE("the 3D gizmo follows cloth that has fallen; moving and turning work a
         space.moveTo(out(40.0 + 20.0 * step), Qt::LeftButton, {});
         w.window.tick();
     }
-    const double moved = w.doc().get(front).arrangement.x - before.x;
+    const double moved = w.doc().get(front).arrangement.at.x - before.at.x;
     EXPECT((moved > 1.0 && length(space.gizmo()->centre - (fallen + Vec3{moved, 0.0, 0.0})) < 1e-6), "the gizmo goes with the hand");
     space.release();
     w.window.tick();
@@ -2326,10 +2326,10 @@ TEST_CASE("a number of a panel's place that is refused leaves its field marked",
     Window w;
     const PanelId front = w.panel("front");
     w.window.select(front);
-    const double before = w.doc().get(front).arrangement.y;
+    const double before = w.doc().get(front).arrangement.at.y;
     ValueField* field = w.window.attributes()->spaceField(session::SpaceField::Y);
     type(field, "1 / 0");
-    EXPECT((w.doc().get(front).arrangement.y == before && field->property("refused").toBool()), "a formula that comes to no number changes nothing, and the field says so");
+    EXPECT((w.doc().get(front).arrangement.at.y == before && field->property("refused").toBool()), "a formula that comes to no number changes nothing, and the field says so");
 }
 
 TEST_CASE("the shelf gives a mirrored instance and bakes the selected panel", "[qt]")
@@ -2349,7 +2349,7 @@ TEST_CASE("the shelf gives a mirrored instance and bakes the selected panel", "[
     EXPECT((!(mirrored == band)), "the new panel is selected");
     const Instance& follows = std::get<Instance>(w.doc().get(w.doc().operations(mirrored).front()));
     EXPECT((follows.source == band && follows.mirrored), "it follows the band, mirrored");
-    EXPECT((w.doc().get(mirrored).x > w.doc().get(band).x), "and stands to its right on the table");
+    EXPECT((w.doc().get(mirrored).at.x > w.doc().get(band).at.x), "and stands to its right on the table");
 
     w.window.select(band);
     w.window.shelf()->bake()->trigger();
@@ -2365,7 +2365,7 @@ TEST_CASE("the shelf instances every selected panel with its seams, and sews an 
     Document doc;
     const PanelId front = doc.add(Panel{.name = "front"});
     const OpRef<Rect> frontRect = doc.add(front, Rect{.width = 20_cm, .height = 60_cm});
-    const PanelId back = doc.add(Panel{.name = "back", .x = 40});
+    const PanelId back = doc.add(Panel{.name = "back", .at = {40, 0}});
     const OpRef<Rect> backRect = doc.add(back, Rect{.width = 20_cm, .height = 60_cm});
     doc.add(Seam{.a = {front, frontRect.right()}, .b = {back, backRect.left()}});
     w.window.open(doc, "legs");
@@ -2768,10 +2768,10 @@ TEST_CASE("a seam the cloth could not close says so on its card, until the cloth
     Document doc;
     const PanelId front = doc.add(Panel{.name = "front"});
     const OpRef<Rect> frontRect = doc.add(front, Rect{.width = 20_cm, .height = 30_cm});
-    const PanelId back = doc.add(Panel{.name = "back", .x = 30});
+    const PanelId back = doc.add(Panel{.name = "back", .at = {30, 0}});
     const OpRef<Rect> backRect = doc.add(back, Rect{.width = 20_cm, .height = 30_cm});
-    doc.arrange(front, Arrangement{.placed = true, .x = 0, .y = 30, .z = 5});
-    doc.arrange(back, Arrangement{.placed = true, .x = 0, .y = 30, .z = -5, .turn = 180});
+    doc.arrange(front, Arrangement{.placed = true, .at = {0, 30, 5}});
+    doc.arrange(back, Arrangement{.placed = true, .at = {0, 30, -5}, .turn = 180});
     const SeamId seam = doc.add(Seam{.a = {front, frontRect.right()}, .b = {back, backRect.left()}});
     w.window.open(std::move(doc), "open seam");
     w.window.select(front);
@@ -2807,7 +2807,7 @@ TEST_CASE("a T-shirt side seam is sewn by two clicks near the hem, without a twi
     const Seam side = doc.get(sample);
     REQUIRE((side.a.panel == front && side.b.panel == back && !side.reversed));
     doc.remove(sample);
-    doc.place(back, doc.get(front).x + 90.0, doc.get(front).y);  // clear of the front
+    doc.place(back, doc.get(front).at + Vec2{90.0, 0.0});  // clear of the front
     w.window.open(std::move(doc), "to sew");
     w.window.tick();
     table->fit();
@@ -2818,7 +2818,7 @@ TEST_CASE("a T-shirt side seam is sewn by two clicks near the hem, without a twi
         Vec2 low = shape.vertices[edge.start].position, high = shape.vertices[edge.end].position;
         if (low.y > high.y) std::swap(low, high);
         const Panel& placed = w.doc().get(which.panel);
-        return Vec2{placed.x + low.x + (high.x - low.x) * up, placed.y + low.y + (high.y - low.y) * up};
+        return placed.at + low + (high - low) * up;
     };
     const auto near = [](Vec2 a, Vec2 b) { return std::hypot(a.x - b.x, a.y - b.y) < 1e-6; };
     // Whether the links join the two lower ends, and the two upper.
@@ -2887,14 +2887,14 @@ TEST_CASE("a panel is placed in space again where the table has it", "[qt]")
     Table w;
     const PanelId plain = w.panel("plain");
     w.window.select(plain);
-    const double was = w.doc().get(plain).arrangement.x;
+    const double was = w.doc().get(plain).arrangement.at.x;
     emit w.window.attributes()->spaceTyped(plain, session::SpaceField::X, "250");
-    REQUIRE(w.doc().get(plain).arrangement.x == 250.0);
+    REQUIRE(w.doc().get(plain).arrangement.at.x == 250.0);
     REQUIRE(w.window.shelf()->placeFromTable()->isEnabled());
     w.window.shelf()->placeFromTable()->trigger();
-    EXPECT((w.doc().get(plain).arrangement.placed && std::abs(w.doc().get(plain).arrangement.x - was) < 1e-9), "it stands where it stood when it was new");
+    EXPECT((w.doc().get(plain).arrangement.placed && std::abs(w.doc().get(plain).arrangement.at.x - was) < 1e-9), "it stands where it stood when it was new");
     w.window.shelf()->undo()->trigger();
-    EXPECT((w.doc().get(plain).arrangement.x == 250.0), "and undo puts it back");
+    EXPECT((w.doc().get(plain).arrangement.at.x == 250.0), "and undo puts it back");
 }
 
 TEST_CASE("an empty table says how to start; the grid's step is written in its corner", "[qt]")
@@ -2997,7 +2997,7 @@ TEST_CASE("Ctrl+C remembers a panel, Ctrl+V pastes it under the pointer, Ctrl+D 
     pressKey(table, Qt::Key_D, Qt::ControlModifier);
     REQUIRE(w.doc().panels().size() == 4);
     const PanelId beside = w.doc().panels().back();
-    EXPECT((w.window.selected() == beside && w.doc().get(beside).name == "driven copy 2" && w.doc().get(beside).x > w.doc().get(driven).x + 20.0),
+    EXPECT((w.window.selected() == beside && w.doc().get(beside).name == "driven copy 2" && w.doc().get(beside).at.x > w.doc().get(driven).at.x + 20.0),
            "Ctrl+D puts a copy of the selected panel beside it, selected");
 }
 
@@ -3055,7 +3055,7 @@ TEST_CASE("Shift- or Ctrl-click adds a panel to the selection or takes it out; a
     Table w;
     Document row;
     for (int i = 0; i < 3; ++i) {
-        const PanelId panel = row.add(Panel{.name = std::string(1, static_cast<char>('a' + i)), .x = 40.0 * i, .y = 0.0});
+        const PanelId panel = row.add(Panel{.name = std::string(1, static_cast<char>('a' + i)), .at = {40.0 * i, 0.0}});
         row.add(panel, Rect{.width = 20_cm, .height = 10_cm});
     }
     w.window.open(std::move(row), "row");
@@ -3071,7 +3071,7 @@ TEST_CASE("Shift- or Ctrl-click adds a panel to the selection or takes it out; a
     click(table, at(b), Qt::ControlModifier);
     EXPECT((w.window.selected() == a && w.window.selectedPanels().size() == 1), "Ctrl-click on a selected panel takes it out");
     drag(table, at(a), by(at(a), table, 0, 12), Qt::ControlModifier);
-    EXPECT((w.window.selected() == a && w.doc().get(a).y > 5.0), "Ctrl-drag on a selected panel moves it and keeps it selected");
+    EXPECT((w.window.selected() == a && w.doc().get(a).at.y > 5.0), "Ctrl-drag on a selected panel moves it and keeps it selected");
     w.window.shelf()->undo()->trigger();
     click(table, at(b));
     EXPECT((w.window.selectedPanels() == std::vector<PanelId>{b}), "a plain click selects only that panel");
@@ -3103,7 +3103,7 @@ TEST_CASE("Shift- or Ctrl-click adds a panel to the selection or takes it out; a
     pressKey(table, Qt::Key_V, Qt::ControlModifier);
     REQUIRE(w.doc().panels().size() == 5);
     EXPECT((w.window.selectedPanels().size() == 2 && w.window.selected() == w.doc().panels()[3]), "Ctrl+V pastes both, selected");
-    EXPECT((std::abs(w.doc().get(w.doc().panels()[4]).x - w.doc().get(w.doc().panels()[3]).x - 80.0) < 0.1), "as far apart as the originals");
+    EXPECT((std::abs(w.doc().get(w.doc().panels()[4]).at.x - w.doc().get(w.doc().panels()[3]).at.x - 80.0) < 0.1), "as far apart as the originals");
     w.window.shelf()->undo()->trigger();
     EXPECT((w.doc().panels().size() == 3), "the paste is one undo step");
 
@@ -3121,7 +3121,7 @@ namespace {
 void openRow(Table& w) {
     Document row;
     for (int i = 0; i < 3; ++i) {
-        const PanelId panel = row.add(Panel{.name = std::string(1, static_cast<char>('a' + i)), .x = 40.0 * i, .y = 0.0});
+        const PanelId panel = row.add(Panel{.name = std::string(1, static_cast<char>('a' + i)), .at = {40.0 * i, 0.0}});
         row.add(panel, Rect{.width = 20_cm, .height = 10_cm});
     }
     w.window.open(std::move(row), "row");
@@ -3133,7 +3133,7 @@ Vec2 tableMiddle(const Table& w, PanelId panel) {
     const std::optional<Bounds> box = bounds(w.window.session().editor().shapes()[panel]);
     const Panel& placed = w.doc().get(panel);
     const Vec2 own = turned(Vec2{(box->min.x + box->max.x) / 2, (box->min.y + box->max.y) / 2}, placed.angle);
-    return {placed.x + own.x, placed.y + own.y};
+    return placed.at + own;
 }
 
 } // namespace
@@ -3150,20 +3150,20 @@ TEST_CASE("several selected panels are dragged together, as one undo step; a cli
     drag(table, table->toScreen({-5, 14}), table->toScreen({45, -4}));
     REQUIRE(w.window.selectedPanels().size() == 2);
     drag(table, at(a), by(at(a), table, 12, -4));
-    EXPECT((std::abs(w.doc().get(a).x - aWas.x - 12.0) < 0.2 && std::abs(w.doc().get(a).y - aWas.y + 4.0) < 0.2), "the panel dragged moves with the pointer");
-    EXPECT((std::abs(w.doc().get(b).x - bWas.x - 12.0) < 0.2 && std::abs(w.doc().get(b).y - bWas.y + 4.0) < 0.2), "and the other selected panel moves as far");
-    EXPECT((w.doc().get(c).x == cWas.x && w.doc().get(c).y == cWas.y), "one that is not selected stays");
+    EXPECT((std::abs(w.doc().get(a).at.x - aWas.at.x - 12.0) < 0.2 && std::abs(w.doc().get(a).at.y - aWas.at.y + 4.0) < 0.2), "the panel dragged moves with the pointer");
+    EXPECT((std::abs(w.doc().get(b).at.x - bWas.at.x - 12.0) < 0.2 && std::abs(w.doc().get(b).at.y - bWas.at.y + 4.0) < 0.2), "and the other selected panel moves as far");
+    EXPECT((w.doc().get(c).at.x == cWas.at.x && w.doc().get(c).at.y == cWas.at.y), "one that is not selected stays");
     EXPECT((w.window.selectedPanels().size() == 2), "the drag leaves them selected");
     w.window.shelf()->undo()->trigger();
-    EXPECT((w.doc().get(a).x == aWas.x && w.doc().get(b).x == bWas.x && w.doc().get(b).y == bWas.y), "one undo puts both back");
+    EXPECT((w.doc().get(a).at.x == aWas.at.x && w.doc().get(b).at.x == bWas.at.x && w.doc().get(b).at.y == bWas.at.y), "one undo puts both back");
 
     drag(table, at(b), by(at(b), table, 7.3, 2.1), Qt::ControlModifier);
-    EXPECT((w.window.selectedPanels().size() == 2 && w.doc().get(b).x != bWas.x && w.doc().get(a).x != aWas.x), "Ctrl-dragging one of them moves both too, and keeps them selected");
+    EXPECT((w.window.selectedPanels().size() == 2 && w.doc().get(b).at.x != bWas.at.x && w.doc().get(a).at.x != aWas.at.x), "Ctrl-dragging one of them moves both too, and keeps them selected");
     w.window.shelf()->undo()->trigger();
 
     // Shift holds the group to the axis the pointer first moved along.
     drag(table, at(a), by(at(a), table, 3, 9), Qt::ShiftModifier);
-    EXPECT((w.doc().get(a).x == aWas.x && w.doc().get(b).x == bWas.x && std::abs(w.doc().get(a).y - aWas.y - 9.0) < 0.2 && std::abs(w.doc().get(b).y - bWas.y - 9.0) < 0.2),
+    EXPECT((w.doc().get(a).at.x == aWas.at.x && w.doc().get(b).at.x == bWas.at.x && std::abs(w.doc().get(a).at.y - aWas.at.y - 9.0) < 0.2 && std::abs(w.doc().get(b).at.y - bWas.at.y - 9.0) < 0.2),
            "with Shift they all go up, and not sideways at all");
     EXPECT((w.window.selectedPanels().size() == 2), "and stay selected");
     w.window.shelf()->undo()->trigger();
@@ -3174,14 +3174,14 @@ TEST_CASE("several selected panels are dragged together, as one undo step; a cli
     EXPECT((std::abs(table->gizmo()->centre.x - 30.0) < 1e-6 && std::abs(table->gizmo()->centre.y - 5.0) < 1e-6), "the gizmo stands at the middle of the group");
     const QPointF onArrow = table->toScreen(session::handleEnd(*table->gizmo(), session::TableHandle::AlongX)) - QPointF(25.0, 0.0);
     drag(table, onArrow, onArrow + QPointF(40.0, -30.0));
-    EXPECT((std::abs(w.doc().get(a).x - aWas.x - 40.0 / table->scale()) < 0.06 && std::abs(w.doc().get(b).x - bWas.x - 40.0 / table->scale()) < 0.06 &&
-            w.doc().get(a).y == aWas.y && w.doc().get(b).y == bWas.y),
+    EXPECT((std::abs(w.doc().get(a).at.x - aWas.at.x - 40.0 / table->scale()) < 0.06 && std::abs(w.doc().get(b).at.x - bWas.at.x - 40.0 / table->scale()) < 0.06 &&
+            w.doc().get(a).at.y == aWas.at.y && w.doc().get(b).at.y == bWas.at.y),
            "its x arrow moves both along x only");
     w.window.shelf()->undo()->trigger();
     choose(w, Tool::Select);
 
     click(table, at(a));
-    EXPECT((w.window.selectedPanels() == std::vector<PanelId>{a} && w.doc().get(a).x == aWas.x), "a click on a selected panel selects only it, and moves nothing");
+    EXPECT((w.window.selectedPanels() == std::vector<PanelId>{a} && w.doc().get(a).at.x == aWas.at.x), "a click on a selected panel selects only it, and moves nothing");
 }
 
 TEST_CASE("several selected panels are turned and scaled together about the middle of the group, and duplicated with Ctrl+D", "[qt]")
@@ -4646,7 +4646,7 @@ TEST_CASE("carrying a panel in 3D does not paint the table again, for nothing on
     QCoreApplication::processEvents();  // the table painted as it is now
     int paints = 0;
     QObject::connect(w.window.table(), &TableView::painted, [&](double) { ++paints; });
-    const double xBefore = w.doc().get(front).arrangement.x;
+    const double xBefore = w.doc().get(front).arrangement.at.x;
     for (int i = 1; i <= 5; ++i) {
         emit w.window.space()->gestured(session::MoveInSpace{front, {static_cast<double>(i), 0.0, 0.0}, i == 1 ? session::DragPhase::Begin : session::DragPhase::Continue});
         w.window.tick();
@@ -4655,7 +4655,7 @@ TEST_CASE("carrying a panel in 3D does not paint the table again, for nothing on
     emit w.window.space()->gestured(session::MoveInSpace{front, {5.0, 0.0, 0.0}, session::DragPhase::End});
     w.window.tick();
     QCoreApplication::processEvents();
-    EXPECT_NEAR(w.doc().get(front).arrangement.x, xBefore + 5.0, "the panel was carried 5 cm in space");
+    EXPECT_NEAR(w.doc().get(front).arrangement.at.x, xBefore + 5.0, "the panel was carried 5 cm in space");
     EXPECT((paints == 0), "and the table, where nothing moved, was not painted again: at 4K that is 3 ms of every frame of the carry");
 
     emit w.window.table()->gestured(session::MovePanel{front, 5.0, 0.0, session::DragPhase::Begin});
@@ -4695,7 +4695,7 @@ TEST_CASE("View > Frame times shows how long the views' frames, a frame's work a
     const std::optional<Bounds> box = bounds(w.window.session().editor().shapes()[front]);
     REQUIRE(box.has_value());
     const Panel& placed = w.doc().get(front);
-    const QPointF middle = w.window.table()->toScreen({placed.x + (box->min.x + box->max.x) / 2, placed.y + box->min.y + (box->max.y - box->min.y) / 4});
+    const QPointF middle = w.window.table()->toScreen({placed.at.x + (box->min.x + box->max.x) / 2, placed.at.y + box->min.y + (box->max.y - box->min.y) / 4});
     drag(w.window.table(), middle, middle + QPointF(30, 0));
     frameTimes->trigger();
     const std::string shown = line->text().toStdString();
@@ -4796,7 +4796,7 @@ struct Lists : Window {
         const OpRef<LineBetween> line = doc.add(cut, LineBetween{.from = {rect.left(), 0.5}, .to = {rect.right(), 0.5}});
         doc.add(cut, Cut{.along = line.line()});
         set = doc.add(cut, SetLength{.edge = rect.bottom(), .length = 25_cm});
-        instance = doc.add(Panel{.name = "instance", .x = 50});
+        instance = doc.add(Panel{.name = "instance", .at = {50, 0}});
         doc.add(instance, Instance{.source = cut});
         window.open(std::move(doc), "lists");
         window.activateWindow();  // as on a desktop: only there can a part of it have the focus

@@ -23,14 +23,14 @@ using namespace twintailor::sim::testing;
 TEST_CASE("a new panel's first place is where the table has it, standing in front of the body")
 {
     Document doc;
-    const PanelId panel = doc.add(Panel{.name = "front", .x = 100, .y = 50, .angle = 30});
+    const PanelId panel = doc.add(Panel{.name = "front", .at = {100, 50}, .angle = 30});
     doc.add(panel, Rect{.width = 40_cm, .height = 60_cm});
     const Result shapes = evaluate(doc);
     const ClothMesh cloth = meshOf(doc, shapes, {.particleDistance = 4_cm});
     const Arrangement standing = arrangementOf(doc, cloth.panels[0]);
     const Arrangement first = firstPlace(doc.get(panel), shapes[panel]);
     EXPECT((first.placed), "it is a place of its own");
-    EXPECT((std::abs(first.x - standing.x) < 1e-9 && std::abs(first.y - standing.y) < 1e-9 && first.z == standing.z && first.roll == 30.0),
+    EXPECT((std::abs(first.at.x - standing.at.x) < 1e-9 && std::abs(first.at.y - standing.at.y) < 1e-9 && first.at.z == standing.at.z && first.roll == 30.0),
            "the same place the panel stood in before it had one: nothing jumps");
     EXPECT((!firstPlace(doc.get(panel), Pattern{}).placed), "an outline with no corners gets no place");
 }
@@ -62,27 +62,27 @@ TEST_CASE("a panel's anchor moves with its sewn edges, so it grows away from the
 TEST_CASE("a panel far out on the table wraps round to stand near the body")
 {
     Document doc;
-    const PanelId near = doc.add(Panel{.name = "near", .x = -20, .y = 80});
+    const PanelId near = doc.add(Panel{.name = "near", .at = {-20, 80}});
     doc.add(near, Rect{.width = 40_cm, .height = 40_cm});
-    const PanelId far = doc.add(Panel{.name = "far", .x = 380, .y = 80});  // two widths of the space to the right
+    const PanelId far = doc.add(Panel{.name = "far", .at = {380, 80}});  // two widths of the space to the right
     doc.add(far, Rect{.width = 40_cm, .height = 40_cm});
-    const PanelId high = doc.add(Panel{.name = "high", .x = -20, .y = 480});
+    const PanelId high = doc.add(Panel{.name = "high", .at = {-20, 480}});
     doc.add(high, Rect{.width = 40_cm, .height = 40_cm});
     const Result shapes = evaluate(doc);
     const Arrangement n = firstPlace(doc.get(near), shapes[near]);
     const Arrangement f = firstPlace(doc.get(far), shapes[far]);
     const Arrangement h = firstPlace(doc.get(high), shapes[high]);
-    std::printf("      near %.0f, %.0f, %.0f; far %.0f, %.0f, %.0f; high %.0f, %.0f, %.0f\n", n.x, n.y, n.z, f.x, f.y, f.z, h.x, h.y, h.z);
-    EXPECT((n.x == 0.0 && n.y == 100.0 && n.z == unarrangedDistance), "within reach of the body, it stands where the table has it");
-    EXPECT((std::abs(f.x) <= standingAcross && f.y == 100.0), "far to the side, it wraps round to stand beside the body");
-    EXPECT((f.z == unarrangedDistance + 2 * standingStepForward), "a step further forward for each time round, clear of the first panels");
-    EXPECT((h.y >= standingLowest && h.y < standingHighest && h.z > unarrangedDistance), "far up the table, it wraps round in height too");
+    std::printf("      near %.0f, %.0f, %.0f; far %.0f, %.0f, %.0f; high %.0f, %.0f, %.0f\n", n.at.x, n.at.y, n.at.z, f.at.x, f.at.y, f.at.z, h.at.x, h.at.y, h.at.z);
+    EXPECT((n.at.x == 0.0 && n.at.y == 100.0 && n.at.z == unarrangedDistance), "within reach of the body, it stands where the table has it");
+    EXPECT((std::abs(f.at.x) <= standingAcross && f.at.y == 100.0), "far to the side, it wraps round to stand beside the body");
+    EXPECT((f.at.z == unarrangedDistance + 2 * standingStepForward), "a step further forward for each time round, clear of the first panels");
+    EXPECT((h.at.y >= standingLowest && h.at.y < standingHighest && h.at.z > unarrangedDistance), "far up the table, it wraps round in height too");
 }
 
 TEST_CASE("panels are arranged in space")
 {
     Document doc;
-    PanelId panel = doc.add(Panel{.name = "front", .x = 30, .y = 50});
+    PanelId panel = doc.add(Panel{.name = "front", .at = {30, 50}});
     doc.add(panel, Rect{.width = 40_cm, .height = 60_cm});
     ClothMesh cloth = meshOf(doc, evaluate(doc), {.particleDistance = 4_cm});
     Placement placed = arranged(doc, cloth);
@@ -98,7 +98,7 @@ TEST_CASE("panels are arranged in space")
     EXPECT((upright), "unarranged, it stands where the table has it");
 
     // Arranged: its centre goes where asked; a quarter turn puts its width along z.
-    doc.arrange(panel, Arrangement{.placed = true, .x = 0, .y = 110, .z = 20, .turn = 90});
+    doc.arrange(panel, Arrangement{.placed = true, .at = {0, 110, 20}, .turn = 90});
     placed = arranged(doc, cloth);
     Vec3 low = placed[0][0], high = placed[0][0];
     for (const Vec3& p : placed[0]) {
@@ -109,7 +109,7 @@ TEST_CASE("panels are arranged in space")
     EXPECT((std::abs((low.z + high.z) / 2 - 20.0) < 1e-9 && std::abs((low.y + high.y) / 2 - 110.0) < 1e-9), "centred where it was put");
 
     // Wrapped half way round: both side edges end up directly behind the middle, a diameter apart.
-    doc.arrange(panel, Arrangement{.placed = true, .x = 0, .y = 110, .z = 20, .wrap = 180});
+    doc.arrange(panel, Arrangement{.placed = true, .at = {0, 110, 20}, .wrap = 180});
     placed = arranged(doc, cloth);
     const double radius = 40.0 / pi;
     double deepest = 0.0, widest = 0.0;
@@ -127,9 +127,9 @@ TEST_CASE("panels are arranged in space")
 
 TEST_CASE("a mirrored arrangement points every direction of the mirrored panel as in a mirror")
 {
-    const Arrangement was{.placed = true, .x = 10, .y = 120, .z = 20, .turn = 30, .tilt = 15, .roll = -40, .wrap = 90, .anchor = Vec2{4, 7}};
+    const Arrangement was{.placed = true, .at = {10, 120, 20}, .turn = 30, .tilt = 15, .roll = -40, .wrap = 90, .anchor = Vec2{4, 7}};
     const Arrangement image = mirrored(was);
-    EXPECT((image.placed && image.x == -10.0 && image.y == 120.0 && image.z == 20.0 && image.wrap == 90.0 && image.anchor == Vec2{-4, 7}), "across x = 0");
+    EXPECT((image.placed && image.at.x == -10.0 && image.at.y == 120.0 && image.at.z == 20.0 && image.wrap == 90.0 && image.anchor == Vec2{-4, 7}), "across x = 0");
     // The panel's own x is the other way round in the mirrored outline, and so is x in space.
     for (const Vec3 own : {Vec3{1, 0, 0}, Vec3{0, 1, 0}, Vec3{0, 0, 1}}) {
         const Vec3 there = inSpace(was, own);
@@ -141,7 +141,7 @@ TEST_CASE("a mirrored arrangement points every direction of the mirrored panel a
 TEST_CASE("an arrangement turned about any axis keeps its anchor and turns every point of the panel")
 {
     const auto near = [](Vec3 a, Vec3 b) { return length(a - b) < 1e-9; };
-    const Arrangement was{.placed = true, .x = 10, .y = 120, .z = 20, .turn = 30, .tilt = 15, .roll = -40};
+    const Arrangement was{.placed = true, .at = {10, 120, 20}, .turn = 30, .tilt = 15, .roll = -40};
     EXPECT(near(inSpace(Arrangement{}, {1, 0, 0}), {1, 0, 0}), "unarranged, the panel's own x is x in space");
     EXPECT(near(inSpace(Arrangement{.turn = 90}, {1, 0, 0}), {0, 0, -1}), "a quarter turn points it along -z");
 
@@ -152,7 +152,7 @@ TEST_CASE("an arrangement turned about any axis keeps its anchor and turns every
 
     for (const Vec3 axis : {Vec3{1, 0, 0}, Vec3{0, 1, 0}, Vec3{0, 0, 1}, Vec3{1, 2, -0.5}}) {
         const Arrangement now = turnedAbout(was, axis, 37.0);
-        EXPECT((now.x == was.x && now.y == was.y && now.z == was.z && now.anchor == was.anchor), "the anchor stays where it stands");
+        EXPECT((now.at.x == was.at.x && now.at.y == was.at.y && now.at.z == was.at.z && now.anchor == was.anchor), "the anchor stays where it stands");
         // Every direction of the panel turns by the same turn about the axis.
         const Vec3 k = normalized(axis);
         const double c = std::cos(37.0 * pi / 180.0), s = std::sin(37.0 * pi / 180.0);
@@ -174,14 +174,14 @@ TEST_CASE("an arrangement turned about any axis keeps its anchor and turns every
 
 TEST_CASE("a panel turned about a point away from its anchor keeps whatever is at that point where it is")
 {
-    const Arrangement was{.placed = true, .x = 10, .y = 120, .z = 20, .turn = 30, .tilt = 15, .roll = -40, .wrap = 90, .anchor = Vec2{4, 7}};
+    const Arrangement was{.placed = true, .at = {10, 120, 20}, .turn = 30, .tilt = 15, .roll = -40, .wrap = 90, .anchor = Vec2{4, 7}};
     const Vec3 through{18, 90, 35}, axis{0.3, 1.0, -0.2};
     const Arrangement now = turnedAbout(was, axis, 70.0, through);
     const Motion motion{.before = was, .after = now};
     EXPECT((length(motion(through) - through) < 1e-9), "the point it is turned about stays");
-    EXPECT((length(Vec3{now.x, now.y, now.z} - Vec3{was.x, was.y, was.z}) > 5.0), "so the anchor goes round it");
+    EXPECT((length(now.at - was.at) > 5.0), "so the anchor goes round it");
     const Arrangement atTheAnchor = turnedAbout(was, axis, 70.0);
     EXPECT((now.turn == atTheAnchor.turn && now.tilt == atTheAnchor.tilt && now.roll == atTheAnchor.roll && now.wrap == was.wrap && now.anchor == was.anchor),
            "it is turned by as much as about its anchor");
-    EXPECT((turnedAbout(was, axis, 70.0, {was.x, was.y, was.z}) == atTheAnchor), "about the anchor it is the same turn");
+    EXPECT((turnedAbout(was, axis, 70.0, was.at) == atTheAnchor), "about the anchor it is the same turn");
 }

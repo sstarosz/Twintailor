@@ -27,7 +27,7 @@ TEST_CASE("documents round-trip through text")
     Document doc;
     Param waist = doc.add(Parameter{.name = "waist \"low\"", .value = 80});
     Param ease = doc.add(Parameter{.name = "ease", .value = max(waist / 20, 2) - abs(-waist) * 0});
-    PanelId half = doc.add(Panel{.name = "half", .x = 12.5, .y = -3, .angle = 30});
+    PanelId half = doc.add(Panel{.name = "half", .at = {12.5, -3}, .angle = 30});
     OpRef<Rect> rect = doc.add(half, Rect{.width = waist / 4 + ease, .height = 60_cm});
     OpRef<Bezier> curve = doc.add(half, Bezier{.edge = rect.top(), .startHandle = {5, -7.5}, .endHandle = {-5, 3}});
     doc.add(half, AdjustPoint{.corner = rect.bottomRight(), .dx = 4_cm, .dy = 0_cm});
@@ -38,7 +38,7 @@ TEST_CASE("documents round-trip through text")
     const OpRef<Scale> scale = doc.add(half, Scale{.x = waist / 80, .y = 0.9});
     doc.setEnabled(curve, false);
     doc.setParticleDistance(half, 1.5);
-    doc.arrange(half, Arrangement{.placed = true, .x = 1, .y = 100, .z = 25.5, .turn = 90, .tilt = -5, .roll = 180, .wrap = 60, .anchor = Vec2{7.5, 58.25}});
+    doc.arrange(half, Arrangement{.placed = true, .at = {1, 100, 25.5}, .turn = 90, .tilt = -5, .roll = 180, .wrap = 60, .anchor = Vec2{7.5, 58.25}});
     PanelId rest = doc.add(Panel{.name = "rest", .construction = true});
     doc.add(rest, Offcut{.of = cut});
     PanelId twin = doc.add(Panel{.name = "twin"});
@@ -527,7 +527,7 @@ TEST_CASE("the trousers saved by 0.1 open, with the same lengths and their avata
     EXPECT_NEAR(shapes[front].length(frontInseam), (std::hypot(7.5, 64.0)), "front inseam");
     EXPECT_NEAR(shapes[back].length(backInseam), (std::hypot(14.5, 62.8)), "back inseam");
     EXPECT_NEAR(shapes[leftFront].length(frontBody.top()), (19.0), "the left leg, a mirrored instance");
-    EXPECT((doc.get(front).name == "right front" && doc.get(front).arrangement.x == -11.5 && doc.get(front).arrangement.wrap == 180.0), "where it stands in space");
+    EXPECT((doc.get(front).name == "right front" && doc.get(front).arrangement.at.x == -11.5 && doc.get(front).arrangement.wrap == 180.0), "where it stands in space");
     REQUIRE(doc.avatar());
     EXPECT((doc.avatar()->name == "avatar.obj" && doc.avatar()->points.size() == 4 && doc.avatar()->triangles.size() == 4 &&
             doc.avatar()->points[0] == Vec3{-6.312365, 0.0, 7.981731}),
@@ -599,7 +599,7 @@ TEST_CASE("every other operation saved by 0.1 opens, with the same lengths")
     EXPECT_NEAR((valueOf(doc.get(Param{4}).value, shapes).value()), (4.0), "a formula with every kind of step");
     EXPECT((doc.get(half).angle == 30.0 && doc.get(half).particleDistance == 1.5 && doc.get(rest).construction && !doc.enabled(OpId{7})),
            "a turned panel, its particle distance, a base piece and a step switched off");
-    EXPECT((doc.get(half).arrangement == Arrangement{.placed = true, .x = 1, .y = 100, .z = 25.5, .turn = 90, .tilt = -5, .roll = 180, .wrap = 60, .anchor = Vec2{7.5, 58.25}}),
+    EXPECT((doc.get(half).arrangement == Arrangement{.placed = true, .at = {1, 100, 25.5}, .turn = 90, .tilt = -5, .roll = 180, .wrap = 60, .anchor = Vec2{7.5, 58.25}}),
            "an arrangement in space, with its anchor");
     EXPECT((doc.avatar() != nullptr), "and the avatar");
 
@@ -622,8 +622,8 @@ TEST_CASE("a file is written to the letter")
     Document doc;
     const Param waist = doc.add(Parameter{.name = "waist \"w\"", .value = 70.1});
     const Param share = doc.add(Parameter{.name = "share", .value = min(max(-Expr(waist), 1e-7), abs(Expr(waist) / 3)) * 100000.0 - 1e20, .unit = Unit::Fraction});
-    const PanelId half = doc.add(Panel{.name = "half", .x = 100000, .y = -1.0 / 3.0, .angle = -0.0, .particleDistance = 1.5});
-    doc.arrange(half, Arrangement{.placed = true, .x = 0.1, .y = 100, .z = 1e21, .turn = 90, .tilt = -5, .roll = 180, .wrap = 60, .anchor = Vec2{7.5, 2.0 / 3.0}});
+    const PanelId half = doc.add(Panel{.name = "half", .at = {100000, -1.0 / 3.0}, .angle = -0.0, .particleDistance = 1.5});
+    doc.arrange(half, Arrangement{.placed = true, .at = {0.1, 100, 1e21}, .turn = 90, .tilt = -5, .roll = 180, .wrap = 60, .anchor = Vec2{7.5, 2.0 / 3.0}});
     const OpRef<Rect> rect = doc.add(half, Rect{.width = waist + share, .height = 60});
     const OpRef<LineBetween> line = doc.add(half, LineBetween{.from = {rect.left(), 0.5}, .to = {rect.right(), 0.25}});
     const OpRef<Cut> cut = doc.add(half, Cut{.along = line.line(), .keep = Cut::Side::Right});
