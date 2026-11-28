@@ -691,3 +691,18 @@ t 0 1 2
     INFO(written);
     CHECK(written == expected);
 }
+
+TEST_CASE("a formula deeper than any typed one saves and opens, and a far deeper one is taken as damage")
+{
+    const auto saved = [](int steps) {
+        Document doc;
+        Expr sum = 1.0;
+        for (int i = 0; i < steps; ++i) sum = sum + 1.0;
+        doc.add(Parameter{.name = "deep", .value = sum});
+        return fromText(toText(doc));
+    };
+    CHECK(std::holds_alternative<SavedScene>(saved(1000)));
+    const std::variant<SavedScene, FileError> damaged = saved(1001);
+    REQUIRE(std::holds_alternative<FileError>(damaged));
+    CHECK(std::get<FileError>(damaged).message == "a formula is nested too deeply");
+}

@@ -1042,3 +1042,23 @@ TEST_CASE("a broken limit is said with its rule and the number that broke it")
     CHECK(saidOf(line) == "From position must be at least 0 and at most 1; it is 1.33333");
     CHECK(saidOf(point) == "Position must be greater than 0 and less than 1; it is 1");
 }
+
+TEST_CASE("a result too large to be a number is an error, and baking never saves it")
+{
+    Document doc;
+    const Param big = doc.add(Parameter{.name = "big", .value = 1e200});
+    const Param square = doc.add(Parameter{.name = "square", .value = Expr(big) * Expr(big)});
+    const PanelId panel = doc.add(Panel{.name = "panel"});
+    const OpRef<Rect> rect = doc.add(panel, Rect{.width = 10_cm, .height = 10_cm});
+    const OpRef<AdjustPoint> moved = doc.add(panel, AdjustPoint{.corner = rect.topLeft(), .dx = Expr(big) * Expr(big), .dy = 0.0});
+
+    const Result result = evaluate(doc);
+    CHECK(result.failed(square));
+    CHECK(result.failed(moved));
+    for (const Expr& huge : {Expr(big) * Expr(big), -Expr(big) * Expr(big), Expr(1e308) + Expr(1e308), Expr(-1e308) - Expr(1e308),
+                             Expr(big) / Expr(1e-200), min(Expr(1.0), Expr(big) * Expr(big))})
+        CHECK(!valueOf(huge, result).has_value());
+
+    CHECK(bake(doc, panel) == 0);
+    CHECK(std::holds_alternative<SavedScene>(fromText(toText(doc))));
+}

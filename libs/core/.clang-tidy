@@ -1,6 +1,6 @@
 # What clang-tidy checks as core is built (cmake/Twintailor.cmake); a finding
 # stops the build, as a compiler warning does. Why these:
-# docs/decisions/0029-clang-tidy.md
+# docs/decisions/0029-clang-tidy-on-core.md
 #
 # Whole families are on, and what is off is listed with the reason:
 #

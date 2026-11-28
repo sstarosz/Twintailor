@@ -134,8 +134,45 @@ TEST_CASE("a number in a formula is read and written in its own way")
     CHECK(written(".") == "'.' is not a number");
     CHECK(written("1.2.3") == "'1.2.3' is not a number");
     CHECK(formatExpr(Expr(1.0 / 3.0), doc) == "0.3333333333");
-    CHECK(formatExpr(Expr(1e20), doc) == "1e+20");
+    CHECK(formatExpr(Expr(1e20), doc) == "100000000000000000000");
     CHECK(formatExpr(Expr(-100000.0), doc) == "-100000");
     CHECK(formatValue(-0.001, Unit::Length) == "0 cm");
     CHECK(formatValue(1234567.891, Unit::None) == "1234567.891");
+}
+
+TEST_CASE("a formula is shown so that it can be typed back, however small or large its numbers")
+{
+    Document doc;
+    const Param width = doc.add(Parameter{.name = "width", .value = 10_cm});
+    for (const double number : {1e-7, -2.5e-9, 1e-300, 2e10, 1.5e300, 0.0}) {
+        const std::string shown = formatExpr(Expr(width) * Expr(number), doc);
+        INFO(shown);
+        CHECK(!shown.contains("e+"));
+        CHECK(!shown.contains("e-"));
+        const std::variant<Expr, TextError> back = parseExpr(shown, doc);
+        REQUIRE(std::holds_alternative<Expr>(back));
+        CHECK(formatExpr(std::get<Expr>(back), doc) == shown);
+    }
+    CHECK(formatExpr(Expr(1e-7), doc) == "0.0000001");
+}
+
+TEST_CASE("a formula too long to type is refused, and the longest one that is taken saves and opens")
+{
+    Document doc;
+    const auto sum = [](int numbers) {
+        std::string text = "1";
+        for (int i = 1; i < numbers; ++i) text += " + 1";
+        return text;
+    };
+    const std::variant<Expr, TextError> longest = parseExpr(sum(200), doc);
+    REQUIRE(std::holds_alternative<Expr>(longest));
+    doc.add(Parameter{.name = "long", .value = std::get<Expr>(longest)});
+    CHECK(std::holds_alternative<SavedScene>(fromText(toText(doc))));
+
+    // Too many numbers, brackets or minus signs: each is refused, none runs out of stack.
+    for (const std::string& text : {sum(201), std::string(100000, '(') + "1", std::string(100000, '-') + "1"}) {
+        const std::variant<Expr, TextError> refused = parseExpr(text, doc);
+        REQUIRE(std::holds_alternative<TextError>(refused));
+        CHECK(std::get<TextError>(refused).message == "the formula is too long; put a part of it in a parameter of its own");
+    }
 }

@@ -140,13 +140,21 @@ std::string numbered(OpId operation, const Document& doc) {
 
 std::string missing(OpId operation) { return operation == OpId{} ? "nothing chosen" : "something that was removed"; }
 
-// What a name's `via` says about it: each mirror it passed through, and each
-// cut that left it as the far piece of its edge.
+// Whether every operation that made a name is still there: its own, and each
+// in its `via`.
+bool stillMade(OpId operation, const std::vector<OpId>& via, const Document& doc) {
+    return doc.contains(operation) && std::ranges::all_of(via, [&](OpId passed) { return doc.contains(passed); });
+}
+
+// What a name's `via` says about it: each mirror it passed through, each cut
+// that left it as the far piece of its edge, and each added point it comes
+// after. Every one of them must still be there.
 std::string viaWords(const std::vector<OpId>& via, const Document& doc) {
     std::string words;
     for (OpId op : via) {
-        if (doc.contains(op) && std::holds_alternative<Cut>(doc.get(op))) words += "far part of ";
-        else if (doc.contains(op) && std::holds_alternative<AddPoint>(doc.get(op))) words += "part after the point of ";
+        const OpData& passed = doc.get(op);
+        if (std::holds_alternative<Cut>(passed)) words += "far part of ";
+        else if (std::holds_alternative<AddPoint>(passed)) words += "part after the point of ";
         else words += "mirrored ";
     }
     return words;
@@ -223,12 +231,12 @@ void remapReferences(OpData& operation, const std::vector<std::pair<OpId, OpId>>
 }
 
 std::string edgeName(const EdgeRef& edge, const Document& doc) {
-    if (!doc.contains(edge.op)) return {};
+    if (!stillMade(edge.op, edge.via, doc)) return {};
     return std::format("{}{}", viaWords(edge.via, doc), edgeRoleName(doc.get(edge.op), edge.role));
 }
 
 std::string shortName(const CornerRef& corner, const Document& doc) {
-    if (!doc.contains(corner.op)) return {};
+    if (!stillMade(corner.op, corner.via, doc)) return {};
     std::string_view role = cornerRoleName(doc.get(corner.op), corner.role);
     constexpr std::string_view said = " corner";  // a list of corners need not say that they are
     if (role.ends_with(said)) role.remove_suffix(said.size());
@@ -237,11 +245,11 @@ std::string shortName(const CornerRef& corner, const Document& doc) {
 
 std::string nameOf(const Reference& reference, const Document& doc) {
     if (const EdgeRef* edge = std::get_if<EdgeRef>(&reference)) {
-        if (!doc.contains(edge->op)) return missing(edge->op);
+        if (!stillMade(edge->op, edge->via, doc)) return missing(edge->op);
         return std::format("{} of {}", edgeName(*edge, doc), numbered(edge->op, doc));
     }
     if (const CornerRef* corner = std::get_if<CornerRef>(&reference)) {
-        if (!doc.contains(corner->op)) return missing(corner->op);
+        if (!stillMade(corner->op, corner->via, doc)) return missing(corner->op);
         return std::format("{}{} of {}", viaWords(corner->via, doc), cornerRoleName(doc.get(corner->op), corner->role), numbered(corner->op, doc));
     }
     if (const LineRef* line = std::get_if<LineRef>(&reference)) {

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <cmath>
 #include <format>
 #include <optional>
 #include <vector>
@@ -17,6 +18,11 @@ namespace {
 constexpr std::string_view degreeSign = "\u00B0";  // °, as UTF-8
 
 // ---- Parsing ------------------------------------------------------------------
+
+// How many numbers, names, brackets and minus signs a typed formula may hold:
+// far more than anyone writes, and few enough that reading it never runs out of
+// stack and that a file holding it opens (File.cpp).
+constexpr int mostParts = 200;
 
 // Recursive descent. Each level returns nothing after recording an error.
 class Parser {
@@ -54,7 +60,9 @@ private:
         return left;
     }
 
+    // Every number, name, bracket and minus sign comes through here once.
     std::optional<Expr> unary() {
+        if (++parts_ > mostParts) return fail("the formula is too long; put a part of it in a parameter of its own");
         if (take('-')) {
             std::optional<Expr> operand = unary();
             if (!operand) return std::nullopt;
@@ -166,12 +174,33 @@ private:
     std::string_view text_;
     const Document& doc_;
     std::size_t at_ = 0;
+    int parts_ = 0;
     std::optional<TextError> error_;
 };
 
 // ---- Formatting ---------------------------------------------------------------
 
 using Kind = ExprNode::Kind;
+
+// A number to so many decimals, without the zeros that say nothing: 26.00 is
+// 26, and 66.70 is 66.7.
+std::string rounded(double value, int decimals) {
+    std::string out = std::format("{:.{}f}", value, decimals);
+    if (out.contains('.')) {
+        while (out.back() == '0') out.pop_back();
+        if (out.back() == '.') out.pop_back();
+    }
+    if (out == "-0") out = "0";
+    return out;
+}
+
+// A number in a formula: to ten figures, and never as 1e-07, which cannot be
+// typed in one.
+std::string tenFigures(double number) {
+    const bool hasSize = std::isfinite(number) && number != 0.0;
+    const int beforePoint = hasSize ? static_cast<int>(std::floor(std::log10(std::abs(number)))) + 1 : 1;
+    return rounded(number, std::max(10 - beforePoint, 0));
+}
 
 // How tightly a node binds: a child that binds looser than its parent needs
 // parentheses.
@@ -200,7 +229,7 @@ std::string written(const ExprNode& n, const Document& doc) {
         return std::format("{} {} {}", writtenChild(*n.a, left, doc), sign, writtenChild(*n.b, right, doc));
     };
     switch (n.kind) {
-    case Kind::Number: return std::format("{:.10g}", n.number);
+    case Kind::Number: return tenFigures(n.number);
     case Kind::Parameter: return doc.contains(n.parameter) ? doc.get(n.parameter).name : "<removed>";
     // The right side of - and / needs parentheses even at the same level: a - (b - c).
     case Kind::Add: return joined('+', 1, 1);
@@ -239,23 +268,13 @@ std::variant<Expr, TextError> parseValue(std::string_view text, Unit unit, const
 }
 
 std::string formatValue(double value, Unit unit) {
-    const auto plain = [](double v, int decimals) {
-        std::string out = std::format("{:.{}f}", v, decimals);
-        // 26.00 -> 26, 66.70 -> 66.7
-        if (out.contains('.')) {
-            while (out.back() == '0') out.pop_back();
-            if (out.back() == '.') out.pop_back();
-        }
-        if (out == "-0") out = "0";
-        return out;
-    };
     switch (unit) {
-    case Unit::Length: return std::format("{} cm", plain(value, 2));
-    case Unit::Angle: return std::format("{}{}", plain(value, 1), degreeSign);
-    case Unit::Fraction: return std::format("{} %", plain(value * 100.0, 1));
-    case Unit::None: return plain(value, 3);
+    case Unit::Length: return std::format("{} cm", rounded(value, 2));
+    case Unit::Angle: return std::format("{}{}", rounded(value, 1), degreeSign);
+    case Unit::Fraction: return std::format("{} %", rounded(value * 100.0, 1));
+    case Unit::None: return rounded(value, 3);
     }
-    return plain(value, 3);
+    return rounded(value, 3);
 }
 
 } // namespace twintailor

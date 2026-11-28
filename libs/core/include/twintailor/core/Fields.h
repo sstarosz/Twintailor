@@ -70,12 +70,12 @@ class Document;
 std::string nameOf(const Reference& reference, const Document& doc);
 
 // What an edge is called without saying which operation made it: "top edge", "mirrored top edge".
-// Empty when the operation that made it was removed.
+// Empty when an operation that made it was removed.
 std::string edgeName(const EdgeRef& edge, const Document& doc);
 
 // A corner in few words, for a list: "top-left", "mirrored cut start", "added
 // point". Without its operation, so two corners may be called alike. Empty when
-// that operation was removed.
+// an operation that made it was removed.
 std::string shortName(const CornerRef& corner, const Document& doc);
 
 // An edge whose length is one of the operation's fields: a rectangle's top

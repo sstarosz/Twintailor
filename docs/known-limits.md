@@ -105,6 +105,8 @@ What comes next is in the [roadmap](../ROADMAP.md).
   brought back by undo is shown and active.
   A panel activated again where cloth has moved into it is pushed apart from it
   at once, which can jolt.
+- A typed formula may hold at most 200 numbers, names, brackets and minus
+  signs. Put a part of a longer one in a parameter of its own.
 
 ## Placing panels
 

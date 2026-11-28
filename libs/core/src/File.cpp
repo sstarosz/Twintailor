@@ -225,8 +225,13 @@ private:
     std::size_t at_ = 0;
 };
 
+// How many steps deep a formula in a file may go. A typed one is far shallower
+// (Text.cpp), which leaves room for what the program builds around one. A
+// deeper one is damage, and reading it could run out of stack.
+constexpr int deepestFormula = 1000;
+
 Expr readExpr(Words& words, int depth = 0) {
-    if (depth > 200) throw Problem{"a formula is nested too deeply"};
+    if (depth > deepestFormula) throw Problem{"a formula is nested too deeply"};
     const std::string head = words.word();
     if (head == "n") return Expr(words.real());
     if (head == "p") return Expr(Param{words.id()});

@@ -168,3 +168,22 @@ TEST_CASE("an edge is named without the operation it is of, whatever the panel i
     EXPECT((nameOf(Reference(rect.top()), doc) == "top edge of 1. Rectangle"), "and nameOf adds the operation to it");
     EXPECT((edgeName(EdgeRef{}, doc).empty()), "an edge of nothing has no name");
 }
+
+TEST_CASE("a name made by a removed operation says that it was removed, not what it was")
+{
+    Document doc;
+    const PanelId panel = doc.add(Panel{.name = "panel"});
+    const OpRef<Rect> rect = doc.add(panel, Rect{.width = 40_cm, .height = 20_cm});
+    const OpRef<LineBetween> line = doc.add(panel, LineBetween{.from = {rect.left(), 0.25}, .to = {rect.right(), 0.75}});
+    const OpRef<Cut> cut = doc.add(panel, Cut{.along = line.line()});
+    const EdgeRef far = cut.farPart(rect.top());
+    const CornerRef farCorner{rect.id, rect.topLeft().role, {cut.id}};
+    CHECK(nameOf(Reference(far), doc) == "far part of top edge of 1. Rectangle");
+
+    doc.remove(OpId(cut));
+    CHECK(nameOf(Reference(far), doc) == "something that was removed");
+    CHECK(nameOf(Reference(farCorner), doc) == "something that was removed");
+    CHECK(edgeName(far, doc).empty());
+    CHECK(shortName(farCorner, doc).empty());
+    CHECK(nameOf(Reference(rect.top()), doc) == "top edge of 1. Rectangle");
+}

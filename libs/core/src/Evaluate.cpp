@@ -23,12 +23,18 @@ using Value = std::expected<double, std::string>;
 
 Value fail(std::string why) { return std::unexpected(std::move(why)); }
 
+// A number that can be worked with and saved: a file holds no infinity.
+Value finite(double number) {
+    if (!std::isfinite(number)) return fail("the result is too large to be a number");
+    return number;
+}
+
 // What a formula comes to. `parameter` says what one of its parameters does;
 // the first thing without a value is what the whole formula reports.
 template <class Parameter>
 Value compute(const ExprNode& n, const Parameter& parameter) {
     using Kind = ExprNode::Kind;
-    if (n.kind == Kind::Number) return n.number;
+    if (n.kind == Kind::Number) return finite(n.number);
     if (n.kind == Kind::Parameter) return parameter(n.parameter);
 
     const Value a = compute(*n.a, parameter);
@@ -39,10 +45,10 @@ Value compute(const ExprNode& n, const Parameter& parameter) {
     const Value b = compute(*n.b, parameter);
     if (!b) return b;
     switch (n.kind) {
-    case Kind::Add: return *a + *b;
-    case Kind::Subtract: return *a - *b;
-    case Kind::Multiply: return *a * *b;
-    case Kind::Divide: return *b == 0.0 ? fail("division by zero") : Value(*a / *b);
+    case Kind::Add: return finite(*a + *b);
+    case Kind::Subtract: return finite(*a - *b);
+    case Kind::Multiply: return finite(*a * *b);
+    case Kind::Divide: return *b == 0.0 ? fail("division by zero") : finite(*a / *b);
     case Kind::Min: return std::min(*a, *b);
     case Kind::Max: return std::max(*a, *b);
     default: return fail("unsupported expression");
