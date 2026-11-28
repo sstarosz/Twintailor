@@ -167,7 +167,7 @@ TEST_CASE("a flat panel looks different from behind than from the front")
     Document doc;
     const PanelId panel = doc.add(Panel{.name = "panel"});
     doc.add(panel, Rect{.width = 60_cm, .height = 60_cm});
-    doc.arrange(panel, Arrangement{.placed = true, .x = 0, .y = 100, .z = 0});
+    doc.arrange(panel, Arrangement{.placed = true, .at = {0, 100, 0}});
     session::Session session(doc, session::Threading::OneStepPerAdvance);
     session.update();
     // A spot on the panel, looking level at it from `yaw` degrees round it.
@@ -322,7 +322,7 @@ TEST_CASE("cloth inside a see-through body shows through it, and a deactivated p
     Document doc;
     const PanelId panel = doc.add(Panel{.name = "inside"});
     doc.add(panel, Rect{.width = 14_cm, .height = 40_cm});
-    doc.arrange(panel, Arrangement{.placed = true, .x = 0, .y = 80, .z = 0});
+    doc.arrange(panel, Arrangement{.placed = true, .at = {0, 80, 0}});
     session::Session session(doc, session::Threading::OneStepPerAdvance);
     putOn(session, figure());
     session.update();
@@ -344,7 +344,7 @@ TEST_CASE("cloth inside a see-through body shows through it, and a deactivated p
 
     // A deactivated panel (see-through itself) in front of the body: the body still shows through it.
     const PanelId front = session.editor().document().panels().front();
-    REQUIRE(tests::change(session, [&](Document& d) { d.arrange(front, Arrangement{.placed = true, .x = 0, .y = 80, .z = 20}); },
+    REQUIRE(tests::change(session, [&](Document& d) { d.arrange(front, Arrangement{.placed = true, .at = {0, 80, 20}}); },
                                    {.touches = session::Touches::PlacementOnly}));
     session.setPanelActive(front, false);
     session.update();

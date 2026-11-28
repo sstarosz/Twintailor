@@ -11,10 +11,8 @@
 //   save(doc, "skirt.twintail", state);  // empty on success, else why not
 //   auto opened = open("skirt.twintail");
 //
-// The format is one thing per line and meant to be stable; its first line
-// carries a version number. Files written when the program was called Cloth
-// CAD (".clothcad") read as any other. Paths are UTF-8, whatever the system's
-// own code page is.
+// The format is one thing per line; its first line carries a version number.
+// Paths are UTF-8, whatever the system's own code page is.
 
 #include <cstddef>
 #include <filesystem>

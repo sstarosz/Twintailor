@@ -1,16 +1,17 @@
 # Building, testing and releasing
 
-Needs CMake 3.25 or newer, a C++23 compiler (Visual Studio 2022 17.10 or
-newer, GCC 12, Clang 17) and vcpkg; the libraries in `vcpkg.json` (Catch2,
-CDT) are built by vcpkg the first time. The window also needs Qt 6 (6.12 on
-Windows: the presets point `CMAKE_PREFIX_PATH` at it; its tests use Qt Test,
-which comes with Qt) and the Vulkan SDK (its headers, with Vulkan-Hpp, and
-`glslangValidator` for the shaders); CMake finds the SDK through the
+Needs CMake 3.25 or newer, a C++23 compiler (Visual Studio 2022 17.10 or newer;
+core also compiles with GCC 13), clang-tidy (in the Visual Studio Installer,
+"C++ Clang tools for Windows") and vcpkg; the libraries in `vcpkg.json`
+(Catch2, CDT) are built by vcpkg the first time. The window also needs Qt 6
+(6.12 on Windows: the presets point `CMAKE_PREFIX_PATH` at it; its tests use Qt
+Test, which comes with Qt) and the Vulkan SDK (its headers, with Vulkan-Hpp,
+and `glslangValidator` for the shaders); CMake finds the SDK through the
 `VULKAN_SDK` variable its installer sets. Without them, everything but the
-window is built. The program is
-`twintailor`; on Windows Qt's libraries are copied next to it when it is built,
-and the avatars (the OBJ files in `assets/`) go in an `assets/` folder beside
-it, where the window looks for them.
+window is built. The program is `twintailor`; on Windows Qt's libraries are
+copied next to it when it is built, and the avatars (the OBJ files in
+`assets/`) go in an `assets/` folder beside it, where the window looks for
+them.
 
 **Use a Release (or RelWithDebInfo) build to work in.** A Debug build runs
 the cloth five to ten times slower, so it moves in slow motion; the interface
@@ -29,7 +30,9 @@ Without the presets: `cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE=<vcpkg>/scripts
 `-DTWINTAILOR_WINDOW=OFF` builds everything but the program that opens a
 window, for machines without a display. A warning stops the build;
 `-DTWINTAILOR_WARNINGS_AS_ERRORS=OFF` lets it through, only for trying
-something out with another compiler.
+something out with another compiler. clang-tidy checks core as it is built, and
+a finding stops the build as a warning does; `-DTWINTAILOR_CLANG_TIDY=OFF`
+builds without it, as on a machine that has none.
 
 A package to hand out, with the program, Qt's libraries, the compiler's
 runtime, the avatars and the licences in `<folder>` (Qt's plugins in

@@ -29,11 +29,11 @@ struct Two {
     Two() {
         front = doc.add(Panel{.name = "front"});
         const OpRef<Rect> a = doc.add(front, Rect{.width = 20_cm, .height = 30_cm});
-        doc.arrange(front, Arrangement{.placed = true, .x = 0, .y = 100, .z = 30});
+        doc.arrange(front, Arrangement{.placed = true, .at = {0, 100, 30}});
         side = doc.add(Panel{.name = "side"});
         const OpRef<Rect> b = doc.add(side, Rect{.width = 10_cm, .height = 30_cm});
-        doc.place(side, 50, 10);
-        doc.arrange(side, Arrangement{.placed = true, .x = 30, .y = 100, .z = 20, .turn = 40});
+        doc.place(side, {50, 10});
+        doc.arrange(side, Arrangement{.placed = true, .at = {30, 100, 20}, .turn = 40});
         doc.add(Seam{.a = {front, a.right()}, .b = {side, b.left()}});
     }
 };
@@ -213,7 +213,7 @@ TEST_CASE("an OBJ's UVs are the pattern as it lies on the table, in the square f
         const Panel& placed = start.doc.get(panel.panel);
         for (const Vec2& point : panel.points) {
             const Vec2 t = turned(point, placed.angle);
-            onTable.push_back({t.x + placed.x, t.y + placed.y});
+            onTable.push_back(t + placed.at);
             min = {std::min(min.x, onTable.back().x), std::min(min.y, onTable.back().y)};
             max = {std::max(max.x, onTable.back().x), std::max(max.y, onTable.back().y)};
         }
@@ -291,7 +291,7 @@ TEST_CASE("a mirrored instance placed as its source's mirror image faces the mir
     Document doc;
     const PanelId right = doc.add(Panel{.name = "right"});
     doc.add(right, Rect{.width = 20_cm, .height = 30_cm});
-    doc.arrange(right, Arrangement{.placed = true, .x = 25, .y = 100, .z = 20, .turn = 30});
+    doc.arrange(right, Arrangement{.placed = true, .at = {25, 100, 20}, .turn = 30});
     const PanelId left = doc.add(Panel{.name = "left"});
     doc.add(left, Instance{.source = right, .mirrored = true});
     doc.arrange(left, mirrored(doc.get(right).arrangement));

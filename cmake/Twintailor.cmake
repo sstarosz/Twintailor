@@ -16,6 +16,38 @@ function(twintailor_warnings target)
     endif()
 endfunction()
 
+# clang-tidy, which looks for mistakes the compiler does not. The one that comes
+# with Visual Studio is taken first, so that it is the compiler's own age.
+function(twintailor_find_clang_tidy)
+    find_program(TWINTAILOR_CLANG_TIDY_PROGRAM clang-tidy HINTS "$ENV{VCINSTALLDIR}/Tools/Llvm/x64/bin")
+    if(NOT TWINTAILOR_CLANG_TIDY_PROGRAM)
+        message(FATAL_ERROR "clang-tidy was not found. Install it (on Windows: add \"C++ Clang tools for Windows\" "
+                            "in the Visual Studio Installer), or configure with -DTWINTAILOR_CLANG_TIDY=OFF.")
+    endif()
+endfunction()
+
+# Checks a target's sources with clang-tidy as they are compiled. The checks are
+# in the .clang-tidy file in the library's folder.
+#
+#   twintailor_clang_tidy(twintailor_core)
+function(twintailor_clang_tidy target)
+    if(NOT TWINTAILOR_CLANG_TIDY)
+        return()
+    endif()
+    set(command "${TWINTAILOR_CLANG_TIDY_PROGRAM}")
+    if(MSVC)
+        # CMake's command line leaves clang-tidy thinking exceptions are off.
+        # And a newer MSVC is given -std:c++23, which clang-tidy does not know:
+        # it would read the code as an old C++. The standard is said again, in
+        # words it knows, and its complaint about the others is turned off.
+        list(APPEND command "--extra-arg=/EHsc" "--extra-arg=/std:c++latest" "--extra-arg=-Wno-unused-command-line-argument")
+    endif()
+    if(TWINTAILOR_WARNINGS_AS_ERRORS)
+        list(APPEND command "--warnings-as-errors=*")
+    endif()
+    set_target_properties(${target} PROPERTIES CXX_CLANG_TIDY "${command}")
+endfunction()
+
 # A library of the project: sources in src/, public headers in
 # include/twintailor/<name>/, private headers in src/.
 #

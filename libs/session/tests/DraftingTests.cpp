@@ -118,7 +118,7 @@ TEST_CASE("bending an arc follows it; a whole circle has no ends to bend between
 TEST_CASE("a panel turns about the middle of its box; a corner of a turned panel follows the mouse")
 {
     Document doc;
-    const PanelId box = doc.add(Panel{.name = "box", .x = 10, .y = 10});
+    const PanelId box = doc.add(Panel{.name = "box", .at = {10, 10}});
     const OpRef<Rect> rect = doc.add(box, Rect{.width = 20_cm, .height = 10_cm});
     Session session(doc, Threading::OneStepPerAdvance);
     Drafting drafting;
@@ -127,7 +127,7 @@ TEST_CASE("a panel turns about the middle of its box; a corner of a turned panel
     const Panel& turned = session.document().get(box);
     const Vec2 middle = twintailor::turned(Vec2{10.0, 5.0}, turned.angle);
     EXPECT((std::abs(turned.angle + 90.0) < 1e-9), "it turns by the angle given");
-    EXPECT((std::abs(turned.x + middle.x - 20.0) < 1e-9 && std::abs(turned.y + middle.y - 15.0) < 1e-9), "about the middle of its box, which stays put");
+    EXPECT((std::abs(turned.at.x + middle.x - 20.0) < 1e-9 && std::abs(turned.at.y + middle.y - 15.0) < 1e-9), "about the middle of its box, which stays put");
     EXPECT((session.document().operations(box).size() == 1), "turning only places it");
 
     // Turned a quarter clockwise, the panel's own +x points down the table.
@@ -140,14 +140,14 @@ TEST_CASE("a panel turns about the middle of its box; a corner of a turned panel
 TEST_CASE("a corner held to one axis does not move along the other, even on a turned panel")
 {
     Document doc;
-    const PanelId box = doc.add(Panel{.name = "box", .x = 3, .y = 4, .angle = 30.0});
+    const PanelId box = doc.add(Panel{.name = "box", .at = {3, 4}, .angle = 30.0});
     const OpRef<Rect> rect = doc.add(box, Rect{.width = 20_cm, .height = 10_cm});
     Session session(doc, Threading::OneStepPerAdvance);
     Drafting drafting;
     // Where a corner is on the table.
     const auto onTable = [&](CornerRef corner) {
         const Vec2 own = turned(session.editor().shapes()[box].position(corner), session.document().get(box).angle);
-        return Vec2{own.x + session.document().get(box).x, own.y + session.document().get(box).y};
+        return own + session.document().get(box).at;
     };
     const Vec2 before = onTable(rect.topRight());
 
@@ -233,7 +233,7 @@ TEST_CASE("two edges are sewn once; a locked corner says why, and a length that 
     const Param width = doc.add(Parameter{.name = "width", .value = 20_cm});
     const PanelId front = doc.add(Panel{.name = "front"});
     const OpRef<Rect> frontRect = doc.add(front, Rect{.width = width, .height = 10_cm});
-    const PanelId back = doc.add(Panel{.name = "back", .x = 30});
+    const PanelId back = doc.add(Panel{.name = "back", .at = {30, 0}});
     const OpRef<Rect> backRect = doc.add(back, Rect{.width = 20_cm, .height = 10_cm});
     Session session(doc, Threading::OneStepPerAdvance);
     Drafting drafting;
@@ -258,7 +258,7 @@ TEST_CASE("two edges are sewn so that the ends nearest the two clicks meet")
     Document doc;
     const PanelId front = doc.add(Panel{.name = "front"});
     const OpRef<Rect> frontRect = doc.add(front, Rect{.width = 20_cm, .height = 30_cm});
-    const PanelId back = doc.add(Panel{.name = "back", .x = 30});
+    const PanelId back = doc.add(Panel{.name = "back", .at = {30, 0}});
     const OpRef<Rect> backRect = doc.add(back, Rect{.width = 20_cm, .height = 30_cm});
     // The front's right edge runs up, the back's left edge down: their starts are at opposite heights.
     const auto sewn = [&](double frontAt, double backAt) {
@@ -279,7 +279,7 @@ TEST_CASE("two edges are sewn so that the ends nearest the two clicks meet")
 TEST_CASE("the scale gizmo scales a Rect, a Circle or a RingSector itself and adds no layer, one undo step a drag")
 {
     Document doc;
-    const PanelId box = doc.add(Panel{.name = "box", .x = 10, .y = 10});
+    const PanelId box = doc.add(Panel{.name = "box", .at = {10, 10}});
     const OpRef<Rect> rect = doc.add(box, Rect{.width = 20_cm, .height = 10_cm});
     Session session(doc, Threading::OneStepPerAdvance);
     Drafting drafting;
@@ -293,7 +293,7 @@ TEST_CASE("the scale gizmo scales a Rect, a Circle or a RingSector itself and ad
     EXPECT((asNumber(session.document().get(rect).width) == 30.0 && asNumber(session.document().get(rect).height) == 10.0), "half as wide again, as tall");
     const auto middleOf = [&]() {
         const Bounds own = *bounds(session.editor().shapes()[box]);
-        return Vec2{session.document().get(box).x + (own.min.x + own.max.x) / 2.0, session.document().get(box).y + (own.min.y + own.max.y) / 2.0};
+        return Vec2{session.document().get(box).at.x + (own.min.x + own.max.x) / 2.0, session.document().get(box).at.y + (own.min.y + own.max.y) / 2.0};
     };
     EXPECT_NEAR((middleOf().x), (20.0), "the middle of the panel's box stays where it was on the table (10 + 10)");
     EXPECT_NEAR((middleOf().y), (15.0), "in y as well");
@@ -301,7 +301,7 @@ TEST_CASE("the scale gizmo scales a Rect, a Circle or a RingSector itself and ad
     EXPECT((asNumber(session.document().get(rect).width) == 30.0 && asNumber(session.document().get(rect).height) == 20.0), "a second drag goes on from what it had");
     EXPECT((session.undo() && asNumber(session.document().get(rect).height) == 10.0), "one undo takes back the second drag");
     EXPECT((session.undo() && asNumber(session.document().get(rect).width) == 20.0), "and one more the first");
-    EXPECT((session.document().get(box).x == 10.0 && session.document().get(box).y == 10.0), "and one undo gave the place back with the shape");
+    EXPECT((session.document().get(box).at.x == 10.0 && session.document().get(box).at.y == 10.0), "and one undo gave the place back with the shape");
 
     // A circle's radius, and a ring's two lengths, grow evenly; stretching one way is refused and changes nothing.
     Document round;
@@ -326,7 +326,7 @@ TEST_CASE("a shape that a formula sets, or an instance, is scaled by a Scale lay
 {
     Document doc;
     const Param wide = doc.add(Parameter{.name = "wide", .value = 20.0, .unit = Unit::Length});
-    const PanelId box = doc.add(Panel{.name = "box", .x = 10, .y = 10});
+    const PanelId box = doc.add(Panel{.name = "box", .at = {10, 10}});
     const OpRef<Rect> rect = doc.add(box, Rect{.width = wide, .height = 10_cm});
     const PanelId twin = doc.add(Panel{.name = "twin"});
     doc.add(twin, Instance{.source = box});
@@ -342,7 +342,7 @@ TEST_CASE("a shape that a formula sets, or an instance, is scaled by a Scale lay
     EXPECT((!asNumber(session.document().get(rect).width).has_value()), "the formula is still what sets the width");
     EXPECT_NEAR((session.editor().shapes()[box].length(rect.bottom())), (30.0), "half as wide again");
     EXPECT_NEAR((session.editor().shapes()[box].position(rect.bottomLeft()).x), (-5.0), "about the middle of its box");
-    EXPECT((session.document().get(box).x == 10.0), "the layer keeps the middle where it was, so the place stays");
+    EXPECT((session.document().get(box).at.x == 10.0), "the layer keeps the middle where it was, so the place stays");
     scaleBy(box, 1.0, 2.0);
     EXPECT((count<Scale>(session.document(), box) == 1), "a second drag changes the same Scale");
     EXPECT((asNumber(last<Scale>(session.document(), box).x) == 1.5 && asNumber(last<Scale>(session.document(), box).y) == 2.0), "on top of what it had");
@@ -381,10 +381,10 @@ TEST_CASE("a rectangle of plain numbers is scaled about the middle of its box in
         const Param wide = doc.add(Parameter{.name = "wide", .value = 20.0, .unit = Unit::Length});
         const PanelId plain = doc.add(Panel{.name = "plain"});
         doc.add(plain, Rect{.width = 20_cm, .height = 10_cm});
-        const PanelId driven = doc.add(Panel{.name = "driven", .x = 40});
+        const PanelId driven = doc.add(Panel{.name = "driven", .at = {40, 0}});
         doc.add(driven, Rect{.width = wide, .height = 10_cm});
         for (PanelId panel : {plain, driven})
-            doc.arrange(panel, Arrangement{.placed = true, .x = 5, .y = 100, .z = 20, .turn = 30, .tilt = 10, .roll = 20, .anchor = anchor});
+            doc.arrange(panel, Arrangement{.placed = true, .at = {5, 100, 20}, .turn = 30, .tilt = 10, .roll = 20, .anchor = anchor});
         Session session(doc, Threading::OneStepPerAdvance);
         Drafting drafting;
         // The middle of a flat panel's particles in space.
@@ -410,7 +410,7 @@ TEST_CASE("a rectangle of plain numbers is scaled about the middle of its box in
             drafting.handle(session, ScalePanel{panel, 2.0, 2.0, DragPhase::End});
             EXPECT((length(middleInSpace(panel) - before) < 1e-6), "the middle of the panel stays at the same point in space");
             const Arrangement now = session.document().get(panel).arrangement;
-            EXPECT((now.x == was.x && now.y == was.y && now.z == was.z && now.turn == was.turn), "its place in space is not what moved");
+            EXPECT((now.at.x == was.at.x && now.at.y == was.at.y && now.at.z == was.at.z && now.turn == was.turn), "its place in space is not what moved");
             EXPECT((session.undo() && session.document().get(panel).arrangement == was), "one undo gives the anchor back with the shape");
             // Out and back again within one drag: exactly as it was.
             drafting.handle(session, ScalePanel{panel, 1.0, 1.0, DragPhase::Begin});
@@ -492,7 +492,7 @@ TEST_CASE("a panel carried and turned in space is placed, not reshaped, one undo
     Document doc;
     const PanelId box = doc.add(Panel{.name = "box"});
     const OpRef<Rect> rect = doc.add(box, Rect{.width = 20_cm, .height = 10_cm});
-    doc.arrange(box, Arrangement{.placed = true, .x = 5, .y = 100, .z = 20, .turn = 30});
+    doc.arrange(box, Arrangement{.placed = true, .at = {5, 100, 20}, .turn = 30});
     Session session(doc, Threading::OneStepPerAdvance);
     Drafting drafting;
     const Arrangement was = session.document().get(box).arrangement;
@@ -502,7 +502,7 @@ TEST_CASE("a panel carried and turned in space is placed, not reshaped, one undo
     drafting.handle(session, MoveInSpace{box, {3, -2, 1}, DragPhase::Continue});
     drafting.handle(session, MoveInSpace{box, {4, -2, 1}, DragPhase::End});
     const Arrangement moved = session.document().get(box).arrangement;
-    EXPECT((moved.x == 9.0 && moved.y == 98.0 && moved.z == 21.0 && moved.turn == 30.0), "carried by how far it was dragged since the drag began");
+    EXPECT((moved.at.x == 9.0 && moved.at.y == 98.0 && moved.at.z == 21.0 && moved.turn == 30.0), "carried by how far it was dragged since the drag began");
     EXPECT((session.editor().shapesVersion() == shapes && std::abs(session.editor().shapes()[box].length(rect.bottom()) - 20.0) < 1e-9), "placing is not shape");
     EXPECT((session.undo() && session.document().get(box).arrangement == was), "the whole drag is one undo step");
 
@@ -510,7 +510,7 @@ TEST_CASE("a panel carried and turned in space is placed, not reshaped, one undo
     drafting.handle(session, TurnInSpace{box, {0, 1, 0}, 20.0, DragPhase::Continue});
     drafting.handle(session, TurnInSpace{box, {0, 1, 0}, 15.0, DragPhase::End});
     const Arrangement turned = session.document().get(box).arrangement;
-    EXPECT((std::abs(turned.turn - 45.0) < 1e-9 && turned.x == was.x && turned.z == was.z), "turned about y by the angle since the drag began, about its anchor");
+    EXPECT((std::abs(turned.turn - 45.0) < 1e-9 && turned.at.x == was.at.x && turned.at.z == was.at.z), "turned about y by the angle since the drag began, about its anchor");
     EXPECT((session.undo() && session.document().get(box).arrangement == was), "one undo step too");
     EXPECT((!session.editor().canUndo()), "and nothing else was changed");
 }
@@ -520,16 +520,16 @@ TEST_CASE("a turn in space about a point, as a gizmo on fallen cloth asks for, c
     Document doc;
     const PanelId box = doc.add(Panel{.name = "box"});
     doc.add(box, Rect{.width = 20_cm, .height = 10_cm});
-    doc.arrange(box, Arrangement{.placed = true, .x = 10, .y = 100, .z = 20});
+    doc.arrange(box, Arrangement{.placed = true, .at = {10, 100, 20}});
     Session session(doc, Threading::OneStepPerAdvance);
     Drafting drafting;
     const Vec3 about{10, 60, 20};  // 40 cm below the anchor
     drafting.handle(session, TurnInSpace{box, {0, 0, 1}, 30.0, DragPhase::Begin, about});
     drafting.handle(session, TurnInSpace{box, {0, 0, 1}, 90.0, DragPhase::End, about});
     const Arrangement now = session.document().get(box).arrangement;
-    EXPECT((std::abs(now.x + 30.0) < 1e-9 && std::abs(now.y - 60.0) < 1e-9 && std::abs(now.z - 20.0) < 1e-9), "the anchor went a quarter of the way round the point");
+    EXPECT((std::abs(now.at.x + 30.0) < 1e-9 && std::abs(now.at.y - 60.0) < 1e-9 && std::abs(now.at.z - 20.0) < 1e-9), "the anchor went a quarter of the way round the point");
     EXPECT((std::abs(now.roll - 90.0) < 1e-9), "and the panel turned with it, by the angle since the drag began");
-    EXPECT((session.undo() && session.document().get(box).arrangement.y == 100.0 && !session.editor().canUndo()), "one undo step");
+    EXPECT((session.undo() && session.document().get(box).arrangement.at.y == 100.0 && !session.editor().canUndo()), "one undo step");
 }
 
 TEST_CASE("Drafting keeps the tool in use; a drawing tool that has done its work goes back to Select")
@@ -628,7 +628,7 @@ TEST_CASE("a copied panel is pasted with its middle at the pointer and follows t
 {
     Document doc;
     const Param width = doc.add(Parameter{.name = "width", .value = 20_cm});
-    const PanelId front = doc.add(Panel{.name = "front", .x = 5, .y = 5});
+    const PanelId front = doc.add(Panel{.name = "front", .at = {5, 5}});
     const OpRef<Rect> rect = doc.add(front, Rect{.width = width, .height = 10_cm});
     Session session(doc, Threading::OneStepPerAdvance);
     Drafting drafting;
@@ -649,8 +649,8 @@ TEST_CASE("a copied panel is pasted with its middle at the pointer and follows t
     const PanelId pasted = panels[1];
     EXPECT((drafting.selection.panel == pasted && session.document().get(pasted).name == "front copy"), "the copy is selected and named for its source");
     const Panel& placed = session.document().get(pasted);
-    EXPECT_NEAR(placed.x + 10.0, 100.0, "the middle of its 20 cm width is under the pointer in x");
-    EXPECT_NEAR(placed.y + 5.0, 40.0, "and its 10 cm height in y");
+    EXPECT_NEAR(placed.at.x + 10.0, 100.0, "the middle of its 20 cm width is under the pointer in x");
+    EXPECT_NEAR(placed.at.y + 5.0, 40.0, "and its 10 cm height in y");
     EXPECT((session.undo() && session.document().panels().size() == 1 && !session.editor().canUndo()), "a paste is one undo step");
     session.redo();
 
@@ -673,7 +673,7 @@ TEST_CASE("pasting without a place goes beside the original; a copied panel that
     drafting.handle(session, CopySelection{});
     drafting.handle(session, PastePanel{std::nullopt});
     const PanelId pasted = session.document().panels()[1];
-    EXPECT((session.document().get(pasted).x > 20.0 && session.document().get(pasted).y == 0.0), "just right of the original, as Duplicate does");
+    EXPECT((session.document().get(pasted).at.x > 20.0 && session.document().get(pasted).at.y == 0.0), "just right of the original, as Duplicate does");
 
     drafting.handle(session, DeletePanel{front});
     const std::uint64_t version = session.editor().version();
@@ -685,7 +685,7 @@ TEST_CASE("pasting without a place goes beside the original; a copied panel that
 TEST_CASE("a copy keeps its source's turn on the table: pasted under the pointer, duplicated clear of it")
 {
     Document doc;
-    const PanelId front = doc.add(Panel{.name = "front", .x = 5, .y = 5, .angle = 30.0});
+    const PanelId front = doc.add(Panel{.name = "front", .at = {5, 5}, .angle = 30.0});
     doc.add(front, Rect{.width = 20_cm, .height = 10_cm});
     Session session(doc, Threading::OneStepPerAdvance);
     Drafting drafting;
@@ -693,7 +693,7 @@ TEST_CASE("a copy keeps its source's turn on the table: pasted under the pointer
     const auto onTable = [&](PanelId panel) {
         const Panel& placed = session.document().get(panel);
         const Bounds own = *bounds(turned(session.editor().shapes()[panel], placed.angle));
-        return Bounds{{own.min.x + placed.x, own.min.y + placed.y}, {own.max.x + placed.x, own.max.y + placed.y}};
+        return Bounds{own.min + placed.at, own.max + placed.at};
     };
     drafting.handle(session, SelectPanel{front});
     drafting.handle(session, CopySelection{});
@@ -719,7 +719,7 @@ TEST_CASE("a group of turned panels is copied with their turns, its middle under
     Document doc;
     const PanelId a = doc.add(Panel{.name = "a", .angle = 90.0});
     doc.add(a, Rect{.width = 20_cm, .height = 10_cm});
-    const PanelId b = doc.add(Panel{.name = "b", .construction = true, .x = 40, .angle = -45.0});
+    const PanelId b = doc.add(Panel{.name = "b", .construction = true, .at = {40, 0}, .angle = -45.0});
     doc.add(b, Rect{.width = 20_cm, .height = 10_cm});
     Session session(doc, Threading::OneStepPerAdvance);
     Drafting drafting;
@@ -728,8 +728,8 @@ TEST_CASE("a group of turned panels is copied with their turns, its middle under
         for (PanelId panel : {first, second}) {
             const Panel& placed = session.document().get(panel);
             const Bounds own = *bounds(turned(session.editor().shapes()[panel], placed.angle));
-            all.min = {std::min(all.min.x, own.min.x + placed.x), std::min(all.min.y, own.min.y + placed.y)};
-            all.max = {std::max(all.max.x, own.max.x + placed.x), std::max(all.max.y, own.max.y + placed.y)};
+            all.min = {std::min(all.min.x, own.min.x + placed.at.x), std::min(all.min.y, own.min.y + placed.at.y)};
+            all.max = {std::max(all.max.x, own.max.x + placed.at.x), std::max(all.max.y, own.max.y + placed.at.y)};
         }
         return all;
     };
@@ -760,9 +760,9 @@ struct Row {
     Document doc;
     PanelId a, b, c;
     Row() {
-        a = doc.add(Panel{.name = "a", .x = 0, .y = 0});
-        b = doc.add(Panel{.name = "b", .x = 40, .y = 0});
-        c = doc.add(Panel{.name = "c", .x = 80, .y = 0});
+        a = doc.add(Panel{.name = "a", .at = {0, 0}});
+        b = doc.add(Panel{.name = "b", .at = {40, 0}});
+        c = doc.add(Panel{.name = "c", .at = {80, 0}});
         for (PanelId panel : {a, b, c}) doc.add(panel, Rect{.width = 20_cm, .height = 10_cm});
     }
 };
@@ -855,9 +855,9 @@ TEST_CASE("copied panels are pasted as a group with their places in it kept, sel
     const Panel& first = session.document().get(panels[3]);
     const Panel& second = session.document().get(panels[4]);
     EXPECT((first.name == "a copy" && second.name == "c copy"), "each is named for its source");
-    EXPECT_NEAR(second.x - first.x, 80.0, "they are as far apart as the originals were");
-    EXPECT_NEAR(first.x + (80.0 + 20.0) / 2.0, 200.0, "the middle of the group's box is under the pointer in x");
-    EXPECT_NEAR(first.y + 5.0, 50.0, "and in y");
+    EXPECT_NEAR(second.at.x - first.at.x, 80.0, "they are as far apart as the originals were");
+    EXPECT_NEAR(first.at.x + (80.0 + 20.0) / 2.0, 200.0, "the middle of the group's box is under the pointer in x");
+    EXPECT_NEAR(first.at.y + 5.0, 50.0, "and in y");
     EXPECT((drafting.selection.panels() == std::vector<PanelId>{panels[3], panels[4]}), "the copies are selected");
     EXPECT((session.undo() && session.document().panels().size() == 3 && !session.editor().canUndo()), "a paste is one undo step");
     session.redo();
@@ -865,7 +865,7 @@ TEST_CASE("copied panels are pasted as a group with their places in it kept, sel
     drafting.handle(session, PastePanel{std::nullopt});
     const std::vector<PanelId> again = session.document().panels();
     REQUIRE(again.size() == 7);
-    EXPECT((session.document().get(again[5]).x >= 0.0 + 100.0 && session.document().get(again[5]).y == 0.0), "without a place the group goes just right of the originals");
+    EXPECT((session.document().get(again[5]).at.x >= 0.0 + 100.0 && session.document().get(again[5]).at.y == 0.0), "without a place the group goes just right of the originals");
     EXPECT((session.document().get(again[5]).name == "a copy 2"), "with a free name");
 
     REQUIRE(tests::change(session, [&](Document& d) { d.remove(row.a); }, {.ifItBreaks = IfItBreaks::Allow}).has_value());
@@ -884,15 +884,15 @@ TEST_CASE("several selected panels move together by as much as the one taken hol
     drafting.handle(session, MovePanel{row.b, 52.0, -3.0, DragPhase::Continue});
     drafting.handle(session, MovePanel{row.b, 52.0, -3.0, DragPhase::End});
     const Document& doc = session.document();
-    EXPECT((doc.get(row.b).x == 52.0 && doc.get(row.b).y == -3.0), "the panel taken hold of is where it was dragged");
-    EXPECT((doc.get(row.a).x == 12.0 && doc.get(row.a).y == -3.0), "the other selected panel moved by the same");
-    EXPECT((doc.get(row.c).x == 80.0 && doc.get(row.c).y == 0.0), "a panel not selected stays");
-    EXPECT((session.undo() && session.document().get(row.a).x == 0.0 && session.document().get(row.b).x == 40.0), "one undo puts both back");
+    EXPECT((doc.get(row.b).at.x == 52.0 && doc.get(row.b).at.y == -3.0), "the panel taken hold of is where it was dragged");
+    EXPECT((doc.get(row.a).at.x == 12.0 && doc.get(row.a).at.y == -3.0), "the other selected panel moved by the same");
+    EXPECT((doc.get(row.c).at.x == 80.0 && doc.get(row.c).at.y == 0.0), "a panel not selected stays");
+    EXPECT((session.undo() && session.document().get(row.a).at.x == 0.0 && session.document().get(row.b).at.x == 40.0), "one undo puts both back");
 
     // A panel that is not selected is moved alone, even if others are selected.
     drafting.handle(session, MovePanel{row.c, 80.0, 0.0, DragPhase::Begin});
     drafting.handle(session, MovePanel{row.c, 90.0, 0.0, DragPhase::End});
-    EXPECT((session.document().get(row.c).x == 90.0 && session.document().get(row.a).x == 0.0 && session.document().get(row.b).x == 40.0), "a panel outside the selection moves alone");
+    EXPECT((session.document().get(row.c).at.x == 90.0 && session.document().get(row.a).at.x == 0.0 && session.document().get(row.b).at.x == 40.0), "a panel outside the selection moves alone");
 }
 
 TEST_CASE("several selected panels turn about the middle of the group; the shapes do not change")
@@ -911,10 +911,10 @@ TEST_CASE("several selected panels turn about the middle of the group; the shape
     const Document& doc = session.document();
     EXPECT((std::abs(doc.get(row.a).angle - 90.0) < 1e-9 && std::abs(doc.get(row.b).angle - 90.0) < 1e-9), "both turn by the angle given");
     // The middle is (30, 5): a's origin is 30 left and 5 below it, and a quarter turn counter-clockwise puts it 5 right and 30 below.
-    EXPECT((std::abs(doc.get(row.a).x - 35.0) < 1e-9 && std::abs(doc.get(row.a).y + 25.0) < 1e-9), "a's origin turned about the middle of the group");
-    EXPECT((std::abs(doc.get(row.b).x - 35.0) < 1e-9 && std::abs(doc.get(row.b).y - 15.0) < 1e-9), "and so is b's");
+    EXPECT((std::abs(doc.get(row.a).at.x - 35.0) < 1e-9 && std::abs(doc.get(row.a).at.y + 25.0) < 1e-9), "a's origin turned about the middle of the group");
+    EXPECT((std::abs(doc.get(row.b).at.x - 35.0) < 1e-9 && std::abs(doc.get(row.b).at.y - 15.0) < 1e-9), "and so is b's");
     EXPECT((std::abs(session.editor().shapes()[row.a].length(OpRef<Rect>(doc.operations(row.a)[0]).bottom()) - 20.0) < 1e-9), "turning is not shape");
-    EXPECT((session.undo() && session.document().get(row.a).angle == 0.0 && session.document().get(row.b).x == 40.0), "one undo turns them back");
+    EXPECT((session.undo() && session.document().get(row.a).angle == 0.0 && session.document().get(row.b).at.x == 40.0), "one undo turns them back");
 
 }
 
@@ -935,20 +935,20 @@ TEST_CASE("several selected panels are scaled together about the middle of the g
     EXPECT((widthOf(row.a) == 30.0 && widthOf(row.b) == 30.0 && widthOf(row.c) == 20.0), "both selected panels are half as big again; the third is left");
     EXPECT((count<Scale>(doc, row.a) == 0 && count<Scale>(doc, row.b) == 0), "no layer is added to either");
     // The middle of the group is (30, 5): a's origin was 30 left of it and 5 below, and is now 1.5 times as far.
-    EXPECT((std::abs(doc.get(row.a).x + 15.0) < 1e-9 && std::abs(doc.get(row.a).y + 2.5) < 1e-9), "a's place moved away from the middle of the group");
-    EXPECT((std::abs(doc.get(row.b).x - 45.0) < 1e-9 && std::abs(doc.get(row.b).y + 2.5) < 1e-9), "and so did b's");
+    EXPECT((std::abs(doc.get(row.a).at.x + 15.0) < 1e-9 && std::abs(doc.get(row.a).at.y + 2.5) < 1e-9), "a's place moved away from the middle of the group");
+    EXPECT((std::abs(doc.get(row.b).at.x - 45.0) < 1e-9 && std::abs(doc.get(row.b).at.y + 2.5) < 1e-9), "and so did b's");
     const std::optional<Vec2> middle = middleOfPanels(doc, session.editor().shapes(), {row.a, row.b});
     EXPECT((middle && std::abs(middle->x - 30.0) < 1e-9 && std::abs(middle->y - 5.0) < 1e-9), "the middle of the group stays where it was");
-    EXPECT((session.undo() && widthOf(row.a) == 20.0 && widthOf(row.b) == 20.0 && session.document().get(row.b).x == 40.0), "one undo puts both back");
+    EXPECT((session.undo() && widthOf(row.a) == 20.0 && widthOf(row.b) == 20.0 && session.document().get(row.b).at.x == 40.0), "one undo puts both back");
 }
 
 TEST_CASE("a group scales a panel that a formula sets by a layer, and keeps the middle of the group where it was")
 {
     Document doc;
     const Param wide = doc.add(Parameter{.name = "wide", .value = 20.0, .unit = Unit::Length});
-    const PanelId a = doc.add(Panel{.name = "a", .x = 0, .y = 0});
+    const PanelId a = doc.add(Panel{.name = "a", .at = {0, 0}});
     doc.add(a, Rect{.width = 20_cm, .height = 10_cm});
-    const PanelId b = doc.add(Panel{.name = "b", .x = 40, .y = 0});
+    const PanelId b = doc.add(Panel{.name = "b", .at = {40, 0}});
     doc.add(b, Rect{.width = wide, .height = 10_cm});
     Session session(doc, Threading::OneStepPerAdvance);
     Drafting drafting;
@@ -956,7 +956,7 @@ TEST_CASE("a group scales a panel that a formula sets by a layer, and keeps the 
     const auto box = [&](PanelId panel) {
         const Bounds own = *bounds(session.editor().shapes()[panel]);
         const Panel& placed = session.document().get(panel);
-        return Bounds{{own.min.x + placed.x, own.min.y + placed.y}, {own.max.x + placed.x, own.max.y + placed.y}};
+        return Bounds{own.min + placed.at, own.max + placed.at};
     };
     const Vec2 before = *middleOfPanels(session.document(), session.editor().shapes(), {a, b});
     drafting.handle(session, ScalePanel{a, 1.0, 1.0, DragPhase::Begin});
@@ -985,7 +985,7 @@ TEST_CASE("Duplicate copies the selected panels just right of the group, keeping
     EXPECT((!drafting.selection.has(row.a) && !drafting.selection.has(row.b)), "the copies are the selection now, not the originals");
     // The originals' box is 0 to 60; the copies go 12 cm beyond it, as far apart as the originals are.
     const PanelId first = doc.panels()[3], second = doc.panels()[4];
-    EXPECT((std::abs(doc.get(first).x - 72.0) < 1e-9 && std::abs(doc.get(second).x - 112.0) < 1e-9 && doc.get(first).y == 0.0), "just right of the group, at the same distance from each other");
+    EXPECT((std::abs(doc.get(first).at.x - 72.0) < 1e-9 && std::abs(doc.get(second).at.x - 112.0) < 1e-9 && doc.get(first).at.y == 0.0), "just right of the group, at the same distance from each other");
     EXPECT((doc.get(first).name == "a copy" && doc.get(second).name == "b copy"), "each named after its source");
     EXPECT((session.undo() && session.document().panels().size() == 3), "one undo takes both copies away");
 
@@ -997,7 +997,7 @@ TEST_CASE("Duplicate copies the selected panels just right of the group, keeping
 TEST_CASE("Add beside makes a copy, an instance or a mirrored instance just right of the source, selected")
 {
     Document doc;
-    const PanelId front = doc.add(Panel{.name = "front", .x = 10, .y = 3});
+    const PanelId front = doc.add(Panel{.name = "front", .at = {10, 3}});
     doc.add(front, Rect{.width = 20_cm, .height = 10_cm});
     Session session(doc, Threading::OneStepPerAdvance);
     Drafting drafting;
@@ -1005,7 +1005,7 @@ TEST_CASE("Add beside makes a copy, an instance or a mirrored instance just righ
     drafting.handle(session, AddBeside{front, Follow::Copy});
     const PanelId copy = session.document().panels()[1];
     EXPECT((session.document().get(copy).name == "front copy" && drafting.selection.panel == copy), "a copy, named for its source and selected");
-    EXPECT((session.document().get(copy).x >= 10.0 + 20.0 && session.document().get(copy).y == 3.0), "clear of the source's right edge, on its row");
+    EXPECT((session.document().get(copy).at.x >= 10.0 + 20.0 && session.document().get(copy).at.y == 3.0), "clear of the source's right edge, on its row");
     EXPECT((count<Rect>(session.document(), copy) == 1), "with the source's layers");
 
     drafting.handle(session, AddBeside{front, Follow::Instance});
@@ -1021,17 +1021,17 @@ TEST_CASE("Add beside makes a copy, an instance or a mirrored instance just righ
 TEST_CASE("a mirrored instance of a panel at one side stands in space as its mirror image, in the same undo step")
 {
     Document doc;
-    const PanelId leg = doc.add(Panel{.name = "leg", .x = 40, .y = 3});
+    const PanelId leg = doc.add(Panel{.name = "leg", .at = {40, 3}});
     doc.add(leg, Rect{.width = 30_cm, .height = 50_cm});
     // Off its middle, and turned every way it can be, so that a wrong sign shows.
-    doc.arrange(leg, Arrangement{.placed = true, .x = 11.5, .y = 60, .z = 20, .turn = 20, .tilt = 10, .roll = 5, .wrap = 180, .anchor = Vec2{9, 31}});
+    doc.arrange(leg, Arrangement{.placed = true, .at = {11.5, 60, 20}, .turn = 20, .tilt = 10, .roll = 5, .wrap = 180, .anchor = Vec2{9, 31}});
     Session session(doc, Threading::OneStepPerAdvance);
     Drafting drafting;
 
     drafting.handle(session, AddBeside{leg, Follow::MirroredInstance});
     const PanelId other = session.document().panels()[1];
     const Arrangement there = session.document().get(other).arrangement;
-    EXPECT((there.placed && there.x == -11.5 && there.y == 60.0 && there.z == 20.0), "across the body's middle, as high and as far forward");
+    EXPECT((there.placed && there.at.x == -11.5 && there.at.y == 60.0 && there.at.z == 20.0), "across the body's middle, as high and as far forward");
     EXPECT((there.turn == -20.0 && there.tilt == 10.0 && there.roll == -5.0 && there.wrap == 180.0), "turned and rolled the other way, tilted and wrapped the same");
     EXPECT((there.anchor == Vec2{-9, 31}), "about the mirror image of the same spot");
 
@@ -1051,7 +1051,7 @@ TEST_CASE("a mirrored instance of a panel at one side stands in space as its mir
         EXPECT((length(image - Vec3{-source.x, source.y, source.z}) < 1e-9), "its mirror image in space");
     }
 
-    REQUIRE(tests::change(session, [&](Document& d) { d.arrange(leg, Arrangement{.placed = true, .x = 30, .y = 80, .z = 5}); }));
+    REQUIRE(tests::change(session, [&](Document& d) { d.arrange(leg, Arrangement{.placed = true, .at = {30, 80, 5}}); }));
     EXPECT((session.document().get(other).arrangement == there), "a first place only: moving the source later leaves the instance where it is");
     EXPECT((session.undo() && session.undo() && session.document().panels().size() == 1), "the instance and its place are one undo step");
 }
@@ -1061,23 +1061,23 @@ TEST_CASE("a source with no anchor of its own is mirrored about the middle of it
     Document doc;
     const PanelId leg = doc.add(Panel{.name = "leg"});
     doc.add(leg, Rect{.width = 30_cm, .height = 50_cm});
-    doc.arrange(leg, Arrangement{.placed = true, .x = -12, .y = 60, .z = -20, .turn = 180});
+    doc.arrange(leg, Arrangement{.placed = true, .at = {-12, 60, -20}, .turn = 180});
     Session session(doc, Threading::OneStepPerAdvance);
     Drafting drafting;
 
     drafting.handle(session, AddBeside{leg, Follow::MirroredInstance});
     const Arrangement there = session.document().get(session.document().panels()[1]).arrangement;
-    EXPECT((there.x == 12.0 && there.z == -20.0 && there.turn == -180.0), "the mirror image");
+    EXPECT((there.at.x == 12.0 && there.at.z == -20.0 && there.turn == -180.0), "the mirror image");
     EXPECT((there.anchor == Vec2{-15, 25}), "the middle of the instance's outline");
 }
 
 TEST_CASE("instances of a panel on the body's middle, plain instances and copies stand where the table has them")
 {
     Document doc;
-    const PanelId front = doc.add(Panel{.name = "front", .x = 10, .y = 60});
+    const PanelId front = doc.add(Panel{.name = "front", .at = {10, 60}});
     doc.add(front, Rect{.width = 40_cm, .height = 20_cm});
     // Less than a quarter of its width to a side: its mirror image would start inside it.
-    doc.arrange(front, Arrangement{.placed = true, .x = 9.9, .y = 104, .z = 14, .wrap = 165, .anchor = Vec2{20, 10}});
+    doc.arrange(front, Arrangement{.placed = true, .at = {9.9, 104, 14}, .wrap = 165, .anchor = Vec2{20, 10}});
     Session session(doc, Threading::OneStepPerAdvance);
     Drafting drafting;
     const auto standsFromTheTable = [&](PanelId panel) {
@@ -1088,9 +1088,9 @@ TEST_CASE("instances of a panel on the body's middle, plain instances and copies
     drafting.handle(session, AddBeside{front, Follow::MirroredInstance});
     EXPECT(standsFromTheTable(session.document().panels()[1]), "on the middle: from the table, as any new panel");
 
-    REQUIRE(tests::change(session, [&](Document& d) { d.arrange(front, Arrangement{.placed = true, .x = 10, .y = 104, .z = 14, .anchor = Vec2{20, 10}}); }));
+    REQUIRE(tests::change(session, [&](Document& d) { d.arrange(front, Arrangement{.placed = true, .at = {10, 104, 14}, .anchor = Vec2{20, 10}}); }));
     drafting.handle(session, AddBeside{front, Follow::MirroredInstance});
-    EXPECT((session.document().get(session.document().panels()[2]).arrangement.x == -10.0), "a quarter of its width to a side: mirrored");
+    EXPECT((session.document().get(session.document().panels()[2]).arrangement.at.x == -10.0), "a quarter of its width to a side: mirrored");
 
     drafting.handle(session, AddBeside{front, Follow::Instance});
     EXPECT(standsFromTheTable(session.document().panels()[3]), "a plain instance: from the table");
@@ -1136,7 +1136,7 @@ TEST_CASE("instances of several selected panels are sewn to each other, in one u
     const Seam& sewn = doc.get(doc.seams().back());
     EXPECT((sewn.a.panel == first && sewn.b.panel == second), "sewn to each other");
     EXPECT((made.notice == "1 seam sewn as on the panels they follow."), "and the help line says so");
-    EXPECT((std::abs(doc.get(first).x - 72.0) < 1e-9 && std::abs(doc.get(second).x - 112.0) < 1e-9), "laid out as their sources are");
+    EXPECT((std::abs(doc.get(first).at.x - 72.0) < 1e-9 && std::abs(doc.get(second).at.x - 112.0) < 1e-9), "laid out as their sources are");
     EXPECT((drafting.selection.panels() == std::vector<PanelId>{first, second}), "and selected");
     EXPECT((session.undo() && session.document().panels().size() == 3 && session.document().seams().size() == 1), "one undo step");
 }
@@ -1144,9 +1144,9 @@ TEST_CASE("instances of several selected panels are sewn to each other, in one u
 TEST_CASE("mirrored instances of a group are laid out as its mirror image")
 {
     Document start;
-    const PanelId wide = start.add(Panel{.name = "wide", .x = 0, .y = 0});
+    const PanelId wide = start.add(Panel{.name = "wide", .at = {0, 0}});
     start.add(wide, Rect{.width = 30_cm, .height = 10_cm});
-    const PanelId narrow = start.add(Panel{.name = "narrow", .x = 35, .y = 4});
+    const PanelId narrow = start.add(Panel{.name = "narrow", .at = {35, 4}});
     start.add(narrow, Rect{.width = 10_cm, .height = 10_cm});
     Session session(start, Threading::OneStepPerAdvance);
     Drafting drafting;
@@ -1158,7 +1158,7 @@ TEST_CASE("mirrored instances of a group are laid out as its mirror image")
     const auto box = [&](PanelId panel) {
         const Bounds own = *bounds(session.editor().shapes()[panel]);
         const Panel& placed = doc.get(panel);
-        return Bounds{{own.min.x + placed.x, own.min.y + placed.y}, {own.max.x + placed.x, own.max.y + placed.y}};
+        return Bounds{own.min + placed.at, own.max + placed.at};
     };
     // The originals: 0 to 30 and 35 to 45. Mirrored, 12 cm beyond: the narrow one 57 to 67, the wide one 72 to 102.
     const Bounds w = box(doc.panels()[2]), n = box(doc.panels()[3]);
@@ -1403,7 +1403,7 @@ TEST_CASE("a seam is selected instead of panels, and let go of when a panel is s
     Document doc;
     const PanelId a = doc.add(Panel{.name = "a"});
     const OpRef<Rect> first = doc.add(a, Rect{.width = 20_cm, .height = 30_cm});
-    const PanelId b = doc.add(Panel{.name = "b", .x = 40});
+    const PanelId b = doc.add(Panel{.name = "b", .at = {40, 0}});
     const OpRef<Rect> second = doc.add(b, Rect{.width = 20_cm, .height = 30_cm});
     const SeamId seam = doc.add(Seam{.a = {a, first.right()}, .b = {b, second.left()}});
     Session session(doc, Threading::OneStepPerAdvance);

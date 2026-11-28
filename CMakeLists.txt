@@ -18,6 +18,8 @@ option(TWINTAILOR_WINDOW "Build the program that opens a window" ON)
 # Warnings are defects: a warning stops the build. Off only to try something
 # out with a compiler that warns about things the project's compilers do not.
 option(TWINTAILOR_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" ON)
+# Core is checked by clang-tidy as it is built; its findings count as warnings.
+option(TWINTAILOR_CLANG_TIDY "Check core with clang-tidy" ON)
 
 # Debug symbols for a release too, in .pdb files that are not part of the
 # package: a crash dump is read with them. They leave the code as fast.
@@ -27,6 +29,9 @@ if(MSVC)
 endif()
 
 include(cmake/Twintailor.cmake)
+if(TWINTAILOR_CLANG_TIDY)
+    twintailor_find_clang_tidy()
+endif()
 
 if(TWINTAILOR_BUILD_TESTS)
     enable_testing()

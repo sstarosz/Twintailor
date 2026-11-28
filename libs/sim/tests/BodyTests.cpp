@@ -88,7 +88,7 @@ TEST_CASE("a surface read from OBJ text is a body")
     Document doc;
     PanelId panel = doc.add(Panel{.name = "cloth"});
     doc.add(panel, Rect{.width = 40_cm, .height = 40_cm});
-    doc.arrange(panel, Arrangement{.placed = true, .x = 0, .y = 30, .z = 0, .tilt = 90});
+    doc.arrange(panel, Arrangement{.placed = true, .at = {0, 30, 0}, .tilt = 90});
     const ClothMesh mesh = meshOf(doc, evaluate(doc), {.particleDistance = 2_cm});
     Cloth cloth(mesh, arranged(doc, mesh));
     double deepest = 1e9;

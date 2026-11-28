@@ -89,10 +89,10 @@ TEST_CASE("the choices of a cut, a mirror and an instance are set by commands")
     const OpRef<Rect> rect = doc.add(panel, Rect{.width = 20_cm, .height = 10_cm});
     const OpRef<LineBetween> line = doc.add(panel, LineBetween{.from = {rect.bottom(), 0.25}, .to = {rect.top(), 0.75}});
     const OpRef<Cut> cut = doc.add(panel, Cut{.along = line.line()});
-    const PanelId half = doc.add(Panel{.name = "mirrored", .x = 60});
+    const PanelId half = doc.add(Panel{.name = "mirrored", .at = {60, 0}});
     const OpRef<Rect> halfRect = doc.add(half, Rect{.width = 10_cm, .height = 10_cm});
     const OpRef<Mirror> mirror = doc.add(half, Mirror{.across = halfRect.left()});
-    const PanelId twin = doc.add(Panel{.name = "twin", .x = 120});
+    const PanelId twin = doc.add(Panel{.name = "twin", .at = {120, 0}});
     const OpRef<Instance> follows = doc.add(twin, Instance{.source = panel});
     Editor editor(doc);
 

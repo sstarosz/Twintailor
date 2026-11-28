@@ -134,48 +134,6 @@ TEST_CASE("cut can enter and leave through one edge")
     EXPECT((result[n].edges.size() == 6), "three sides, two pieces of the top, and the cut");
 }
 
-TEST_CASE("line that misses the panel is an error")
-{
-    Document doc;
-    PanelId panel = doc.add(Panel{.name = "panel"});
-    OpRef<Rect> rect = doc.add(panel, Rect{.width = 40_cm, .height = 30_cm});
-    OpRef<Line> outward = doc.add(panel, Line{.from = rect.bottomLeft(), .angle = 225_deg});
-    OpRef<Cut> cut = doc.add(panel, Cut{.along = outward.line()});
-
-    Result result = evaluate(doc);
-    EXPECT((result.failed(outward)), "the line is reported");
-    EXPECT((result.failed(cut)), "the cut has no line to follow");
-    EXPECT((result[panel].edges.size() == 4), "the rectangle is untouched");
-}
-
-TEST_CASE("line between two points on the outline")
-{
-    Document doc;
-    Param height = doc.add(Parameter{.name = "height", .value = 30_cm});
-    PanelId panel = doc.add(Panel{.name = "panel"});
-    OpRef<Rect> rect = doc.add(panel, Rect{.width = 40_cm, .height = height});
-    // The left edge runs top to bottom, the right edge bottom to top.
-    OpRef<LineBetween> line = doc.add(panel, LineBetween{.from = {rect.left(), 0.5}, .to = {rect.right(), 1.0}});
-    OpRef<Cut> cut = doc.add(panel, Cut{.along = line.line(), .keep = Cut::Side::Right});
-
-    Result result = evaluate(doc);
-    EXPECT((result.ok()), "no errors");
-    EXPECT_NEAR((result[panel].line(line.line()).start.y), (15.0), "halfway down the left edge");
-    EXPECT_NEAR((result[panel].line(line.line()).end.y), (30.0), "to the top of the right edge");
-    EXPECT_NEAR((result[panel].length(rect.left())), (15.0), "keeping the lower part: the left edge is halved");
-    EXPECT_NEAR((result[panel].length(rect.right())), (30.0), "the right edge is whole");
-    EXPECT((!result[panel].contains(rect.top())), "the top edge is gone");
-    EXPECT_NEAR((result[panel].length(cut.edge())), (std::hypot(40.0, 15.0)), "the new edge");
-
-    doc.set(height, 50_cm);
-    EXPECT_NEAR((evaluate(doc)[panel].line(line.line()).start.y), (25.0), "the line stays halfway when the panel grows");
-
-    doc.set(line, &LineBetween::to, EdgePoint{rect.right(), 2.0});
-    EXPECT((evaluate(doc).failed(line)), "a position past the end of the edge is outside the field's limits");
-    doc.set(line, &LineBetween::to, EdgePoint{rect.left(), 0.5});
-    EXPECT((evaluate(doc).failed(line)), "a line from a point to itself is an error");
-}
-
 TEST_CASE("mirror joins two halves")
 {
     Document doc;

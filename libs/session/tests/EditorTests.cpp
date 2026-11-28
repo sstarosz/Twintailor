@@ -105,11 +105,11 @@ TEST_CASE("moving a panel changes no outline, so nothing is evaluated again")
     OnePanel start;
     Editor editor(start.doc);
     const auto shapesBefore = editor.shapesVersion();
-    REQUIRE(editor.change([&](Document& doc) { doc.place(start.panel, 30, 40); }, {.touches = Touches::PlacementOnly}));
+    REQUIRE(editor.change([&](Document& doc) { doc.place(start.panel, {30, 40}); }, {.touches = Touches::PlacementOnly}));
     EXPECT(editor.shapesVersion() == shapesBefore, "the outlines are left as they were");
-    EXPECT(editor.document().get(start.panel).x == 30.0, "the panel has moved");
+    EXPECT(editor.document().get(start.panel).at.x == 30.0, "the panel has moved");
     EXPECT(editor.undo(), "and it can be undone");
-    EXPECT(editor.document().get(start.panel).x == 0.0, "back where it was");
+    EXPECT(editor.document().get(start.panel).at.x == 0.0, "back where it was");
 }
 
 TEST_CASE("another document starts a new history")
@@ -186,14 +186,14 @@ TEST_CASE("a panel gets its place in space once; then the table no longer moves 
     const Arrangement first = editor.document().get(start.panel).arrangement;
     EXPECT((first.placed), "a panel that has an outline is given a place in space");
 
-    REQUIRE(editor.change([&](Document& doc) { doc.place(start.panel, 300, 200); }, {.touches = Touches::PlacementOnly}));
+    REQUIRE(editor.change([&](Document& doc) { doc.place(start.panel, {300, 200}); }, {.touches = Touches::PlacementOnly}));
     REQUIRE(editor.change([&](Document& doc) { doc.turn(start.panel, 45); }, {.touches = Touches::PlacementOnly}));
     EXPECT((editor.document().get(start.panel).arrangement == first), "moving and turning it on the table leaves it where it is in space");
 
     // A new panel is placed in the same step it was made in: one undo removes it whole.
     PanelId added;
     REQUIRE(editor.change([&](Document& doc) {
-        added = doc.add(Panel{.name = "pocket", .x = 10, .y = 10});
+        added = doc.add(Panel{.name = "pocket", .at = {10, 10}});
         doc.add(added, Rect{.width = 10_cm, .height = 10_cm});
     }));
     EXPECT((editor.document().get(added).arrangement.placed), "a panel made now gets its place at once");
@@ -203,7 +203,7 @@ TEST_CASE("a panel gets its place in space once; then the table no longer moves 
     // Taking the place away gives it again, from where the table has the panel now.
     REQUIRE(editor.change([&](Document& doc) { doc.arrange(start.panel, Arrangement{}); }, {.touches = Touches::PlacementOnly}));
     const Arrangement again = editor.document().get(start.panel).arrangement;
-    EXPECT((again.placed && again.roll == 45.0 && again.x != first.x), "placed again where the table has it now");
+    EXPECT((again.placed && again.roll == 45.0 && again.at.x != first.at.x), "placed again where the table has it now");
     editor.undo();
     EXPECT((editor.document().get(start.panel).arrangement == first), "which undo takes back");
 
@@ -223,7 +223,7 @@ TEST_CASE("a longer skirt keeps its waist where it is in space and grows at the 
     const Param length = doc.add(Parameter{.name = "length", .value = 40});
     const PanelId skirt = doc.add(Panel{.name = "skirt"});
     const OpRef<Rect> rect = doc.add(skirt, Rect{.width = 30_cm, .height = length});
-    const PanelId band = doc.add(Panel{.name = "band", .x = 50});
+    const PanelId band = doc.add(Panel{.name = "band", .at = {50, 0}});
     const OpRef<Rect> bandRect = doc.add(band, Rect{.width = 30_cm, .height = 4_cm});
     doc.add(Seam{.a = {skirt, rect.top()}, .b = {band, bandRect.bottom()}, .reversed = true});
     Editor editor(doc);
@@ -239,7 +239,7 @@ TEST_CASE("a longer skirt keeps its waist where it is in space and grows at the 
     const auto waistOnTable = [&] {
         const Panel& p = editor.document().get(skirt);
         const Vec2 top = turned(editor.shapes()[skirt].position(rect.topLeft()), p.angle);
-        return Vec2{p.x + top.x, p.y + top.y};
+        return p.at + top;
     };
     REQUIRE(editor.change([&](Document& d) { d.turn(skirt, 90); }, {.touches = Touches::PlacementOnly}));
     const auto [waist, hem] = ends();
@@ -257,7 +257,7 @@ TEST_CASE("a longer skirt keeps its waist where it is in space and grows at the 
     const Panel placedBefore = editor.document().get(skirt);
     REQUIRE(editor.change([&](Document& d) { d.set(length, Expr(50)); }, {.grows = Grows::WhereDragged}));
     const Panel& placedAfter = editor.document().get(skirt);
-    EXPECT((placedAfter.x == placedBefore.x && placedAfter.y == placedBefore.y && placedAfter.arrangement == placedBefore.arrangement),
+    EXPECT((placedAfter.at.x == placedBefore.at.x && placedAfter.at.y == placedBefore.at.y && placedAfter.arrangement == placedBefore.arrangement),
            "a change made by hand leaves its place on the table and in space alone");
     EXPECT_NEAR(ends().second, hem, "so its own origin, the hem, stays, as it does on the table");
 }

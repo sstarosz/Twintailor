@@ -296,7 +296,7 @@ void TableView::show(const Document& doc, const Result& shapes, std::optional<Pa
     for (const PanelResult& result : shapes.panels) {
         if (!doc.contains(result.panel) || result.pattern.vertices.empty()) continue;
         const Panel& panel = doc.get(result.panel);
-        Drawn d{result.panel, panel.name, placedOnTable(result.pattern, panel.angle, {panel.x, panel.y}), {}, {}, false, {panel.x, panel.y}, panel.angle, {}, {}, {}, {}};
+        Drawn d{result.panel, panel.name, placedOnTable(result.pattern, panel.angle, panel.at), {}, {}, false, panel.at, panel.angle, {}, {}, {}, {}};
         for (const SymmetryAxis& axis : d.pattern.axes)
             d.axes.push_back({axis.start, axis.end});
         for (SeamId id : doc.seams()) {
@@ -307,7 +307,7 @@ void TableView::show(const Document& doc, const Result& shapes, std::optional<Pa
         for (OpId op : doc.operations(result.panel)) d.instance = d.instance || std::holds_alternative<Instance>(doc.get(op));
         const std::optional<Bounds> own = bounds(result.pattern);
         const Vec2 middle = own ? turned(Vec2{(own->min.x + own->max.x) / 2.0, (own->min.y + own->max.y) / 2.0}, panel.angle) : Vec2{};
-        d.pivot = {middle.x + panel.x, middle.y + panel.y};
+        d.pivot = middle + panel.at;
         if (selected && *selected == result.panel && others.empty()) {
             for (const Vertex& v : d.pattern.vertices) d.cornerLocks.push_back(session::cornerLock(doc, shapes, result.panel, v.name));
             for (const Edge& e : d.pattern.edges)

@@ -47,14 +47,13 @@ struct Parameter {
 struct Arrangement {
     bool placed = false;  // false: no place of its own yet; it stands in front of the body, where the 2D table has it.
                           // session::Editor gives every panel its place once, so in the window this is short-lived
-    double x = 0.0;       // the centre of the panel in space, in cm; the floor is y = 0,
-    double y = 0.0;       // y points up, and the body faces +z
-    double z = 0.0;
+    Vec3 at{};            // the centre of the panel in space, in cm; the floor is y = 0,
+                          // y points up, and the body faces +z
     double turn = 0.0;    // degrees about the vertical axis
     double tilt = 0.0;    // degrees about the panel's own horizontal axis
     double roll = 0.0;    // degrees in the panel's own plane
     double wrap = 0.0;    // degrees the panel is bent around a vertical axis behind it; 0 is flat
-    // The spot of the panel, in its own flat coordinates, that x, y, z place
+    // The spot of the panel, in its own flat coordinates, that `at` places
     // and that it turns and bends about. None: the middle of its outline's box.
     // When the outline changes, session::Editor moves it with the panel's sewn
     // edges, so that a panel grows away from its seams (a skirt at the hem).
@@ -66,8 +65,8 @@ struct Arrangement {
 struct Panel {
     std::string name;           // display label
     bool construction = false;  // true: only a base for instances, not a piece to cut
-    double x = 0.0;             // where the panel's own origin sits on the table, in cm;
-    double y = 0.0;             // it does not affect the panel's shape
+    Vec2 at{};                  // where the panel's own origin sits on the table, in cm;
+                                // placement only, it does not affect the shape
     double angle = 0.0;         // how far the panel is turned about its origin on the table, in degrees
                                 // counter-clockwise; placement only, it does not affect the shape
     Arrangement arrangement{};  // where it is in space
@@ -138,7 +137,7 @@ public:
     PanelCopy copy(PanelId source, Panel description);
     void rename(PanelId panel, std::string name);
     // Moves the panel on the table.
-    void place(PanelId panel, double x, double y);
+    void place(PanelId panel, Vec2 at);
     // Turns the panel on the table, about its origin, to `degrees`.
     void turn(PanelId panel, double degrees);
     // Places the panel in space.
@@ -166,7 +165,7 @@ public:
     // `reference` comes from references(doc.get(operation)). Throws
     // std::invalid_argument if `value` is the wrong kind of thing for it,
     // such as a corner where an edge is needed.
-    void set(OpId operation, ReferenceId reference, Reference value);
+    void set(OpId operation, ReferenceId reference, const Reference& value);
     void remove(OpId operation);
     // Switches an operation off or on. One that is off stays in the list but
     // is skipped when the panel is built.

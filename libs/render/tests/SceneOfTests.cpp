@@ -36,10 +36,10 @@ struct TwoPanels {
     TwoPanels() {
         front = doc.add(Panel{.name = "front"});
         doc.add(front, Rect{.width = 40_cm, .height = 60_cm});
-        doc.arrange(front, Arrangement{.placed = true, .x = 0, .y = 100, .z = 30});
+        doc.arrange(front, Arrangement{.placed = true, .at = {0, 100, 30}});
         copy = doc.add(Panel{.name = "copy"});
         doc.add(copy, Instance{.source = front});
-        doc.arrange(copy, Arrangement{.placed = true, .x = 0, .y = 100, .z = -30});
+        doc.arrange(copy, Arrangement{.placed = true, .at = {0, 100, -30}});
     }
 };
 
@@ -175,10 +175,10 @@ TEST_CASE("an open seam is lined along both edges; a closed one has no lines unl
     Document doc;
     const PanelId left = doc.add(Panel{.name = "left"});
     const OpRef<Rect> leftRect = doc.add(left, Rect{.width = 20_cm, .height = 30_cm});
-    doc.arrange(left, Arrangement{.placed = true, .x = -20, .y = 100, .z = 0});
+    doc.arrange(left, Arrangement{.placed = true, .at = {-20, 100, 0}});
     const PanelId right = doc.add(Panel{.name = "right"});
     const OpRef<Rect> rightRect = doc.add(right, Rect{.width = 20_cm, .height = 30_cm});
-    doc.arrange(right, Arrangement{.placed = true, .x = 20, .y = 100, .z = 0});
+    doc.arrange(right, Arrangement{.placed = true, .at = {20, 100, 0}});
     const SeamId seam = doc.add(Seam{.a = {left, leftRect.right()}, .b = {right, rightRect.left()}});
     session::Session session(doc, session::Threading::OneStepPerAdvance);
     session.update();
@@ -248,10 +248,10 @@ TEST_CASE("a seam the cloth could not close is lined in red; selected it stays a
     Document doc;
     const PanelId left = doc.add(Panel{.name = "left"});
     const OpRef<Rect> leftRect = doc.add(left, Rect{.width = 20_cm, .height = 30_cm});
-    doc.arrange(left, Arrangement{.placed = true, .x = -20, .y = 30, .z = 0});
+    doc.arrange(left, Arrangement{.placed = true, .at = {-20, 30, 0}});
     const PanelId right = doc.add(Panel{.name = "right"});
     const OpRef<Rect> rightRect = doc.add(right, Rect{.width = 20_cm, .height = 30_cm});
-    doc.arrange(right, Arrangement{.placed = true, .x = 20, .y = 30, .z = 0});
+    doc.arrange(right, Arrangement{.placed = true, .at = {20, 30, 0}});
     const SeamId seam = doc.add(Seam{.a = {left, leftRect.right()}, .b = {right, rightRect.left()}});
     session::Session session(doc, session::Threading::OneStepPerAdvance);
     session.simulate(true);
@@ -311,10 +311,10 @@ TEST_CASE("an open seam joins each particle to the one it is sewn to, so that a 
         Document doc;
         const PanelId left = doc.add(Panel{.name = "left"});
         const OpRef<Rect> leftRect = doc.add(left, Rect{.width = 20_cm, .height = 20_cm});
-        doc.arrange(left, Arrangement{.placed = true, .x = -20, .y = 100, .z = 0});
+        doc.arrange(left, Arrangement{.placed = true, .at = {-20, 100, 0}});
         const PanelId right = doc.add(Panel{.name = "right"});
         const OpRef<Rect> rightRect = doc.add(right, Rect{.width = 20_cm, .height = 20_cm});
-        doc.arrange(right, Arrangement{.placed = true, .x = 20, .y = 100, .z = 0});
+        doc.arrange(right, Arrangement{.placed = true, .at = {20, 100, 0}});
         doc.add(Seam{.a = {left, leftRect.right()}, .b = {right, rightRect.left()}, .reversed = twisted});
         session::Session session(doc, session::Threading::OneStepPerAdvance);
         session.update();
@@ -376,18 +376,18 @@ struct Bent {
     explicit Bent(bool reversed = false, double apart = 0.0, bool lid = false) {
         flat = doc.add(Panel{.name = "flat"});
         const OpRef<Rect> a = doc.add(flat, Rect{.width = 20_cm, .height = 20_cm});
-        doc.arrange(flat, Arrangement{.placed = true, .x = -10, .y = 100, .z = 0});
+        doc.arrange(flat, Arrangement{.placed = true, .at = {-10, 100, 0}});
         side = doc.add(Panel{.name = "side"});
         const OpRef<Rect> b = doc.add(side, Rect{.width = 20_cm, .height = 20_cm});
         // Turned about the upright so that the edge it is sewn by stays at x = 0, z = 0.
         const double half = 5.0, deep = 10.0 * std::sin(60.0 * std::numbers::pi / 180.0);
-        doc.arrange(side, Arrangement{.placed = true, .x = half + apart, .y = 100, .z = -deep, .turn = reversed ? 240.0 : 60.0});
+        doc.arrange(side, Arrangement{.placed = true, .at = {half + apart, 100, -deep}, .turn = reversed ? 240.0 : 60.0});
         doc.add(Seam{.a = {flat, a.right()}, .b = {side, reversed ? b.right() : b.left()}, .reversed = reversed});
         if (!lid) return;
         top = doc.add(Panel{.name = "top"});
         const OpRef<Rect> c = doc.add(top, Rect{.width = 20_cm, .height = 20_cm});
         const double lean = 10.0 * std::sin(45.0 * std::numbers::pi / 180.0);
-        doc.arrange(top, Arrangement{.placed = true, .x = -10, .y = 110 + lean, .z = lean, .tilt = 45});
+        doc.arrange(top, Arrangement{.placed = true, .at = {-10, 110 + lean, lean}, .tilt = 45});
         doc.add(Seam{.a = {flat, a.top()}, .b = {top, c.bottom()}});
     }
 };

@@ -32,6 +32,18 @@ TEST_CASE("a point turns counter-clockwise about the origin")
     EXPECT_NEAR((there.y), (10.0), "onto the y axis");
 }
 
+TEST_CASE("a direction in the plane has an angle, a length of one and a left")
+{
+    const Vec2 up = unitAt(radians(90.0));
+    EXPECT_NEAR((up.x), (0.0), "off the x axis");
+    EXPECT_NEAR((up.y), (1.0), "one up");
+    EXPECT_NEAR((degrees(angleOf(Vec2{3.0, 3.0}))), (45.0), "half way to the y axis");
+    EXPECT_NEAR((degrees(angleOf(Vec2{0.0, -2.0}))), (-90.0), "below is clockwise");
+    EXPECT_NEAR((length(normalized(Vec2{3.0, 4.0}))), (1.0), "a direction is one long");
+    EXPECT((normalized(Vec2{}) == Vec2{}), "nothing has no direction");
+    EXPECT((leftOf(Vec2{2.0, 1.0}) == Vec2{-1.0, 2.0}), "a quarter turn counter-clockwise");
+}
+
 TEST_CASE("vectors in space add, scale and multiply")
 {
     const Vec3 a{1.0, 0.0, 0.0}, b{0.0, 1.0, 0.0};

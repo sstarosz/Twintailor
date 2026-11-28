@@ -329,7 +329,8 @@ private:
     struct Carried {
         PanelId grabbed;
         std::vector<PanelId> panels;
-        double x, y, angle;
+        Vec2 at;
+        double angle;
     };
     std::optional<Carried> carried_;
     // Starts one: of the selected panels if `panel` is one of them, else of it alone.

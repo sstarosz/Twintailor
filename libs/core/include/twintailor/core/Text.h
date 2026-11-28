@@ -8,7 +8,9 @@
 // Syntax: numbers (optionally followed by cm, mm, deg, ° or %, which makes a
 // fraction: 50 % is 0.5), parameter names,
 // + - * /, parentheses, pi, and min(a, b), max(a, b), abs(a), clamp(v, lo, hi).
-// A parameter can be typed if its name is letters, digits and underscores.
+// A parameter can be typed if its name is letters, digits and underscores. A
+// formula too long to type is refused: more than 200 numbers, names, brackets
+// and minus signs.
 
 #include <cstddef>
 #include <string>

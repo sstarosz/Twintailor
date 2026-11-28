@@ -34,7 +34,7 @@ struct Skirt {
         length = doc.add(Parameter{.name = "length", .value = 40});
         panel = doc.add(Panel{.name = "skirt"});
         rect = doc.add(panel, Rect{.width = 40_cm, .height = length});
-        doc.arrange(panel, Arrangement{.placed = true, .x = 0, .y = 140, .z = 40});
+        doc.arrange(panel, Arrangement{.placed = true, .at = {0, 140, 40}});
     }
 };
 
@@ -94,7 +94,7 @@ TEST_CASE("the mesh is made again only when the outlines change")
     const auto mesh = session.mesh();
     EXPECT((mesh && mesh->panels.size() == 1u), "the panel is meshed");
 
-    REQUIRE(tests::change(session, [&](Document& doc) { doc.place(start.panel, 50, 50); }, {.touches = Touches::PlacementOnly}));
+    REQUIRE(tests::change(session, [&](Document& doc) { doc.place(start.panel, {50, 50}); }, {.touches = Touches::PlacementOnly}));
     session.update();
     EXPECT(session.meshesMade() == made, "moving the panel on the table does not mesh it again");
 
@@ -159,7 +159,7 @@ TEST_CASE("the scene version goes up only when something to draw changed")
     const auto version = session.sceneVersion();
     frames(session, 5);
     EXPECT(session.sceneVersion() == version, "nothing changed, nothing to draw again");
-    REQUIRE(tests::change(session, [&](Document& doc) { doc.arrange(start.panel, Arrangement{.placed = true, .x = 10, .y = 140, .z = 40}); },
+    REQUIRE(tests::change(session, [&](Document& doc) { doc.arrange(start.panel, Arrangement{.placed = true, .at = {10, 140, 40}}); },
                                    {.touches = Touches::PlacementOnly}));
     session.update();
     EXPECT(session.sceneVersion() > version, "arranging the panel elsewhere is something to draw");
@@ -293,7 +293,7 @@ TEST_CASE("a body shown while another is chosen is only drawn: the document, the
 TEST_CASE("Play asked while the body is being worked out is kept: the cloth starts when the body is ready, and meets it")
 {
     Skirt start;
-    start.doc.arrange(start.panel, Arrangement{.placed = true, .x = 0, .y = 200, .z = 0, .tilt = 90});  // flat, above the ball
+    start.doc.arrange(start.panel, Arrangement{.placed = true, .at = {0, 200, 0}, .tilt = 90});  // flat, above the ball
     Session session(start.doc, Threading::OneStepPerAdvance);
     putOn(session, ball(80));  // large, so that working it out takes a moment: its top is at 180 cm
     session.update();
@@ -428,7 +428,7 @@ struct Pair {
     Pair() {
         other = start.doc.add(Panel{.name = "other"});
         const OpRef<Rect> rect = start.doc.add(other, Rect{.width = 40_cm, .height = 40_cm});
-        start.doc.arrange(other, Arrangement{.placed = true, .x = 0, .y = 140, .z = -40});
+        start.doc.arrange(other, Arrangement{.placed = true, .at = {0, 140, -40}});
         seam = start.doc.add(Seam{.a = {start.panel, start.rect.right()}, .b = {other, rect.left()}});
     }
 };
@@ -606,7 +606,7 @@ TEST_CASE("a draped panel moved in space takes its drape along; nothing starts a
     const double time = session.cloth().time;
 
     Arrangement higher = session.document().get(start.panel).arrangement;
-    higher.y += 20.0;
+    higher.at.y += 20.0;
     REQUIRE(tests::change(session, [&](Document& doc) { doc.arrange(start.panel, higher); }, {.touches = Touches::PlacementOnly}));
     session.update();
     double off = 0.0;
@@ -907,7 +907,7 @@ TEST_CASE("a draped panel's change of wrap is applied: it bends where it hangs, 
     Skirt start;
     const PanelId other = start.doc.add(Panel{.name = "other"});
     start.doc.add(other, Rect{.width = 10_cm, .height = 10_cm});
-    start.doc.arrange(other, Arrangement{.placed = true, .x = 60, .y = 140, .z = 40});
+    start.doc.arrange(other, Arrangement{.placed = true, .at = {60, 140, 40}});
     Session session(start.doc, Threading::OneStepPerAdvance);
     session.simulate(true);
     frames(session, 20);
@@ -936,7 +936,7 @@ TEST_CASE("a panel is hidden without leaving the cloth; deactivated, it stands s
     Skirt start;
     const PanelId other = start.doc.add(Panel{.name = "other"});
     start.doc.add(other, Rect{.width = 20_cm, .height = 20_cm});
-    start.doc.arrange(other, Arrangement{.placed = true, .x = 60, .y = 140, .z = 40});
+    start.doc.arrange(other, Arrangement{.placed = true, .at = {60, 140, 40}});
     Session session(start.doc, Threading::OneStepPerAdvance);
     session.update();
     const auto heightOf = [&](PanelId panel) {
@@ -1058,7 +1058,7 @@ TEST_CASE("an export is of the pattern as it is now, also when nothing has shown
         REQUIRE(tests::change(session, [&](Document& doc) { doc.set(start.length, Expr(55)); }));
         session.update(false);
         EXPECT_NEAR(heightOf(verticesOf(session.obj())), 55.0, "an edit is in it");
-        REQUIRE(tests::change(session, [&](Document& doc) { doc.arrange(start.panel, Arrangement{.placed = true, .x = 70, .y = 140, .z = 40}); },
+        REQUIRE(tests::change(session, [&](Document& doc) { doc.arrange(start.panel, Arrangement{.placed = true, .at = {70, 140, 40}}); },
                                        {.touches = Touches::PlacementOnly}));
         session.update(false);
         double middle = 0.0;
@@ -1096,7 +1096,7 @@ TEST_CASE("an export leaves out hidden panels, keeps deactivated ones, and says 
     Skirt start;
     const PanelId other = start.doc.add(Panel{.name = "other"});
     start.doc.add(other, Rect{.width = 20_cm, .height = 20_cm});
-    start.doc.arrange(other, Arrangement{.placed = true, .x = 60, .y = 140, .z = 40});
+    start.doc.arrange(other, Arrangement{.placed = true, .at = {60, 140, 40}});
     Session session(start.doc, Threading::OneStepPerAdvance);
     session.update();
     session.setPanelActive(other, false);

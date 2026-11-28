@@ -10,6 +10,7 @@
 
 #include <concepts>
 #include <cstdint>
+#include <utility>
 #include <variant>
 
 #include "twintailor/core/Expr.h"
@@ -28,14 +29,14 @@ struct Rect {
 
     struct Names {
         OpId id;
-        EdgeRef bottom() const { return {id, static_cast<uint16_t>(Edge::Bottom)}; }
-        EdgeRef right() const { return {id, static_cast<uint16_t>(Edge::Right)}; }
-        EdgeRef top() const { return {id, static_cast<uint16_t>(Edge::Top)}; }
-        EdgeRef left() const { return {id, static_cast<uint16_t>(Edge::Left)}; }
-        CornerRef bottomLeft() const { return {id, static_cast<uint16_t>(Corner::BottomLeft)}; }
-        CornerRef bottomRight() const { return {id, static_cast<uint16_t>(Corner::BottomRight)}; }
-        CornerRef topRight() const { return {id, static_cast<uint16_t>(Corner::TopRight)}; }
-        CornerRef topLeft() const { return {id, static_cast<uint16_t>(Corner::TopLeft)}; }
+        EdgeRef bottom() const { return edgeOf(id, Edge::Bottom); }
+        EdgeRef right() const { return edgeOf(id, Edge::Right); }
+        EdgeRef top() const { return edgeOf(id, Edge::Top); }
+        EdgeRef left() const { return edgeOf(id, Edge::Left); }
+        CornerRef bottomLeft() const { return cornerOf(id, Corner::BottomLeft); }
+        CornerRef bottomRight() const { return cornerOf(id, Corner::BottomRight); }
+        CornerRef topRight() const { return cornerOf(id, Corner::TopRight); }
+        CornerRef topLeft() const { return cornerOf(id, Corner::TopLeft); }
     };
 };
 
@@ -55,12 +56,12 @@ struct Circle {
 
     struct Names {
         OpId id;
-        EdgeRef arc() const { return {id, static_cast<uint16_t>(Edge::Arc)}; }
-        EdgeRef startSide() const { return {id, static_cast<uint16_t>(Edge::StartSide)}; }  // slices only
-        EdgeRef endSide() const { return {id, static_cast<uint16_t>(Edge::EndSide)}; }      // slices only
-        CornerRef start() const { return {id, static_cast<uint16_t>(Corner::Start)}; }
-        CornerRef end() const { return {id, static_cast<uint16_t>(Corner::End)}; }          // slices only
-        CornerRef centre() const { return {id, static_cast<uint16_t>(Corner::Centre)}; }    // slices only
+        EdgeRef arc() const { return edgeOf(id, Edge::Arc); }
+        EdgeRef startSide() const { return edgeOf(id, Edge::StartSide); }  // slices only
+        EdgeRef endSide() const { return edgeOf(id, Edge::EndSide); }      // slices only
+        CornerRef start() const { return cornerOf(id, Corner::Start); }
+        CornerRef end() const { return cornerOf(id, Corner::End); }          // slices only
+        CornerRef centre() const { return cornerOf(id, Corner::Centre); }    // slices only
     };
 };
 
@@ -83,14 +84,14 @@ struct RingSector {
 
     struct Names {
         OpId id;
-        EdgeRef inner() const { return {id, static_cast<uint16_t>(Edge::Inner)}; }
-        EdgeRef outer() const { return {id, static_cast<uint16_t>(Edge::Outer)}; }
-        EdgeRef startSide() const { return {id, static_cast<uint16_t>(Edge::StartSide)}; }
-        EdgeRef endSide() const { return {id, static_cast<uint16_t>(Edge::EndSide)}; }
-        CornerRef innerStart() const { return {id, static_cast<uint16_t>(Corner::InnerStart)}; }
-        CornerRef innerEnd() const { return {id, static_cast<uint16_t>(Corner::InnerEnd)}; }
-        CornerRef outerStart() const { return {id, static_cast<uint16_t>(Corner::OuterStart)}; }
-        CornerRef outerEnd() const { return {id, static_cast<uint16_t>(Corner::OuterEnd)}; }
+        EdgeRef inner() const { return edgeOf(id, Edge::Inner); }
+        EdgeRef outer() const { return edgeOf(id, Edge::Outer); }
+        EdgeRef startSide() const { return edgeOf(id, Edge::StartSide); }
+        EdgeRef endSide() const { return edgeOf(id, Edge::EndSide); }
+        CornerRef innerStart() const { return cornerOf(id, Corner::InnerStart); }
+        CornerRef innerEnd() const { return cornerOf(id, Corner::InnerEnd); }
+        CornerRef outerStart() const { return cornerOf(id, Corner::OuterStart); }
+        CornerRef outerEnd() const { return cornerOf(id, Corner::OuterEnd); }
     };
 };
 
@@ -199,21 +200,19 @@ struct Cut {
 
     struct Names {
         OpId id;
-        EdgeRef edge() const { return {id, static_cast<uint16_t>(Edge::Cut)}; }
+        EdgeRef edge() const { return edgeOf(id, Edge::Cut); }
         // Present only where the cut makes a new corner. Where the line
         // starts or ends on an existing corner, that corner keeps its name.
-        CornerRef start() const { return {id, static_cast<uint16_t>(Corner::Start)}; }
-        CornerRef end() const { return {id, static_cast<uint16_t>(Corner::End)}; }
-        EdgeRef farPart(EdgeRef original) const {
-            original.via.push_back(id);
-            return original;
-        }
+        CornerRef start() const { return cornerOf(id, Corner::Start); }
+        CornerRef end() const { return cornerOf(id, Corner::End); }
+        EdgeRef farPart(EdgeRef original) const { return passedThrough(std::move(original), id); }
     };
 };
 
 // Starting operation: the piece that a Cut in another panel removes. A cut
 // plus an offcut of it is a split: two panels that share the cut line and
 // follow it when it changes. Edges keep the names they have in the source.
+// While that cut is switched off there is no piece: its panel is empty.
 //
 //   Offcut{.of = hem}      // hem is the OpRef<Cut> in the other panel
 struct Offcut {
@@ -240,14 +239,8 @@ struct Mirror {
 
     struct Names {
         OpId id;
-        EdgeRef image(EdgeRef original) const {
-            original.via.push_back(id);
-            return original;
-        }
-        CornerRef image(CornerRef original) const {
-            original.via.push_back(id);
-            return original;
-        }
+        EdgeRef image(EdgeRef original) const { return passedThrough(std::move(original), id); }
+        CornerRef image(CornerRef original) const { return passedThrough(std::move(original), id); }
     };
 };
 
@@ -282,11 +275,8 @@ struct AddPoint {
 
     struct Names {
         OpId id;
-        CornerRef corner() const { return {id, static_cast<uint16_t>(Corner::Point)}; }
-        EdgeRef after(EdgeRef original) const {
-            original.via.push_back(id);
-            return original;
-        }
+        CornerRef corner() const { return cornerOf(id, Corner::Point); }
+        EdgeRef after(EdgeRef original) const { return passedThrough(std::move(original), id); }
     };
 };
 

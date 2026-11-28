@@ -1,4 +1,5 @@
-// Unit tests of File.cpp: documents as text and as files.
+// Unit tests of FileWrite.cpp and FileRead.cpp: documents written as text and
+// read back.
 
 #include <algorithm>
 #include <cmath>
@@ -26,7 +27,7 @@ TEST_CASE("documents round-trip through text")
     Document doc;
     Param waist = doc.add(Parameter{.name = "waist \"low\"", .value = 80});
     Param ease = doc.add(Parameter{.name = "ease", .value = max(waist / 20, 2) - abs(-waist) * 0});
-    PanelId half = doc.add(Panel{.name = "half", .x = 12.5, .y = -3, .angle = 30});
+    PanelId half = doc.add(Panel{.name = "half", .at = {12.5, -3}, .angle = 30});
     OpRef<Rect> rect = doc.add(half, Rect{.width = waist / 4 + ease, .height = 60_cm});
     OpRef<Bezier> curve = doc.add(half, Bezier{.edge = rect.top(), .startHandle = {5, -7.5}, .endHandle = {-5, 3}});
     doc.add(half, AdjustPoint{.corner = rect.bottomRight(), .dx = 4_cm, .dy = 0_cm});
@@ -37,7 +38,7 @@ TEST_CASE("documents round-trip through text")
     const OpRef<Scale> scale = doc.add(half, Scale{.x = waist / 80, .y = 0.9});
     doc.setEnabled(curve, false);
     doc.setParticleDistance(half, 1.5);
-    doc.arrange(half, Arrangement{.placed = true, .x = 1, .y = 100, .z = 25.5, .turn = 90, .tilt = -5, .roll = 180, .wrap = 60, .anchor = Vec2{7.5, 58.25}});
+    doc.arrange(half, Arrangement{.placed = true, .at = {1, 100, 25.5}, .turn = 90, .tilt = -5, .roll = 180, .wrap = 60, .anchor = Vec2{7.5, 58.25}});
     PanelId rest = doc.add(Panel{.name = "rest", .construction = true});
     doc.add(rest, Offcut{.of = cut});
     PanelId twin = doc.add(Panel{.name = "twin"});
@@ -62,15 +63,15 @@ TEST_CASE("documents round-trip through text")
     EXPECT((again.get(half).particleDistance == 1.5 && !again.get(rest).particleDistance), "a panel's own particle distance survives, and none stays none");
     EXPECT((again.get(half).arrangement == doc.get(half).arrangement && !again.get(rest).arrangement.placed), "arrangement in space survives, with its anchor");
     {
-        // A file from before 0.1.1: an arrangement without an anchor.
-        std::string old = text;
-        const std::size_t at = old.find(" 7.5 58.25\n");
+        // An arrangement may say no anchor.
+        std::string unanchored = text;
+        const std::size_t at = unanchored.find(" 7.5 58.25\n");
         REQUIRE(at != std::string::npos);
-        old.erase(at, std::string(" 7.5 58.25").size());
-        const std::variant<SavedScene, FileError> readOld = fromText(old);
-        REQUIRE(std::holds_alternative<SavedScene>(readOld));
-        const Arrangement oldOne = std::get<SavedScene>(readOld).document.get(half).arrangement;
-        EXPECT((oldOne.placed && oldOne.wrap == 60.0 && !oldOne.anchor), "an older file without an anchor still reads, anchored in the middle");
+        unanchored.erase(at, std::string(" 7.5 58.25").size());
+        const std::variant<SavedScene, FileError> readBack = fromText(unanchored);
+        REQUIRE(std::holds_alternative<SavedScene>(readBack));
+        const Arrangement placed = std::get<SavedScene>(readBack).document.get(half).arrangement;
+        EXPECT((placed.placed && placed.wrap == 60.0 && !placed.anchor), "it reads, anchored in the middle");
     }
     // New things made after reading do not collide with what was read.
     const PanelId added = again.add(Panel{.name = "new"});
@@ -79,6 +80,7 @@ TEST_CASE("documents round-trip through text")
     const auto bad = [](const char* file) { return std::holds_alternative<FileError>(fromText(file)); };
     EXPECT((bad("")), "an empty file is refused");
     EXPECT((bad("hello")), "so is another kind of file");
+    EXPECT((bad("clothcad 1\n")), "and one of the name the program had before");
     EXPECT((bad("twintailor 2\n")), "and a newer version");
     std::variant<SavedScene, FileError> broken = fromText("twintailor 1\npanel 1 \"a\" 0 0 0 0\nop 2 Rect 1 2 n 5 oops 0 0\n");
     EXPECT((std::holds_alternative<FileError>(broken) && std::get<FileError>(broken).line == 3), "a bad line is reported by number");
@@ -350,17 +352,17 @@ TEST_CASE("a set length survives saving and opening, with what it keeps")
     EXPECT((std::holds_alternative<FileError>(fromText(wrong))), "a way of keeping the program does not know is refused");
 }
 
-// ---- Files as 0.1 wrote them ----
+// ---- Kept texts ----
 //
-// Never change these texts, nor take a check away. They are files people have:
-// a later version must keep opening them, with the same shapes. A later version
-// adds a new case, with texts of its own, for what its files can hold.
+// Whole files, holding everything a file can: each is read, comes to the same
+// shapes and is written back to the letter. A change of the format changes them,
+// on purpose and in the same change, until 0.1 is released (decision 0031).
 
 namespace {
 
-// The trousers sample (examples/07_trousers.cpp), as Save wrote it, on a
-// made-up avatar of four points.
-constexpr const char* trousersAsWrittenBy01 = R"file(clothcad 1
+// The trousers sample (examples/07_trousers.cpp), on a made-up avatar of four
+// points.
+constexpr const char* trousersText = R"file(twintailor 1
 next 37
 parameter 1 "waist" n 76
 parameter 2 "hips" n 94
@@ -415,7 +417,7 @@ t 1 2 3
 
 // A document of made-up pieces with the operations the trousers lack, and the
 // rest of what a file can say.
-constexpr const char* piecesAsWrittenBy01 = R"file(clothcad 1
+constexpr const char* piecesText = R"file(twintailor 1
 next 31
 parameter 1 "waist \"low\"" n 80
 parameter 2 "sweep" n 180 unit angle
@@ -430,23 +432,23 @@ op 9 AddPoint 1 1 / p 1 n 200 1 e 6 0 0 0
 op 10 LineBetween 1 2 n 0.5 n 0.25 2 e 6 3 0 e 6 1 0 0
 op 11 Cut 1 0 1 l 10 1 0
 op 12 Mirror 1 0 1 e 11 0 0 1 1
-op 13 Scale 1 2 / p 1 n 80 n 0.90000000000000002 0 0
+op 13 Scale 1 2 / p 1 n 80 n 0.9 0 0
 panel 14 "rest" 1 0 0 0
 op 15 Offcut 1 0 0 1 11
 panel 16 "twin" 0 80 0 0
-arrange 82.700000000000003 26.550000000000001 45 0 0 0 0 2.7000000000000011 26.550000000000001
+arrange 82.7 26.55 45 0 0 0 0 2.700000000000001 26.55
 op 17 Instance 1 0 1 P 5 1 0
 panel 18 "ring" 0 160 0 0
-arrange -40 162.27255188602635 75 0 0 0 0 0 -37.727448113973658
+arrange -40 162.27255188602635 75 0 0 0 0 0 -37.72744811397366
 op 19 RingSector 1 3 p 1 p 2 n 50 0 0
 panel 20 "disc" 0 260 0 0
 arrange 60 0 60 0 0 0 0 0 0
 op 21 Circle 1 2 n 20 n 360 0 0
 panel 22 "slice" 0 320 0 0
-arrange -80 190.00493439634269 90 0 0 0 0 8.8817841970012523e-16 -9.9950656036573164
+arrange -80 190.0049343963427 90 0 0 0 0 8.881784197001252e-16 -9.995065603657316
 op 23 Circle 1 2 n 20 * n 180 p 3 0 0
 panel 24 "hem" 0 380 0 0
-arrange -0.68541628353602846 30.000000000000007 75 0 0 0 0 19.314583716463996 30.000000000000007
+arrange -0.6854162835360285 30.000000000000007 75 0 0 0 0 19.314583716463996 30.000000000000007
 op 25 Rect 1 2 n 40 n 60 0 0
 op 26 SetLength 1 1 / p 1 n 2.5 1 e 25 2 0 1 0
 op 27 Line 1 1 n 25 1 c 25 0 0 0
@@ -482,8 +484,8 @@ t 0 3 2
 t 1 2 3
 )file";
 
-// A band, as Save wrote it once the program was called Twintailor.
-constexpr const char* bandAsWrittenByTwintailor = R"file(twintailor 1
+// A band: the least a file with a shape holds.
+constexpr const char* bandText = R"file(twintailor 1
 next 4
 parameter 1 "waist" n 76
 panel 2 "band" 0 0 0 0
@@ -501,16 +503,16 @@ Document opened(const char* text) { return scene(text).document; }
 
 TEST_CASE("a file says that Twintailor wrote it, and one that does opens")
 {
-    const Document doc = opened(bandAsWrittenByTwintailor);
+    const Document doc = opened(bandText);
     const Result shapes = evaluate(doc);
     REQUIRE(shapes.errors.empty());
     EXPECT_NEAR((shapes[PanelId{2}].length(OpRef<Rect>(OpId{3}).top())), (38.0), "half the waist");
     EXPECT((toText(doc).starts_with("twintailor 1\n")), "a file is written under the program's name");
 }
 
-TEST_CASE("the trousers saved by 0.1 open, with the same lengths and their avatar")
+TEST_CASE("the kept trousers open, with their lengths, seams and avatar")
 {
-    Document doc = opened(trousersAsWrittenBy01);
+    Document doc = opened(trousersText);
     const PanelId front{9}, back{17}, leftFront{28};
     const OpRef<Rect> frontBody(OpId{10}), backBody(OpId{18});
     const EdgeRef frontInseam = frontBody.right(), backInseam = OpRef<AddPoint>(OpId{19}).after(backBody.left());
@@ -526,7 +528,7 @@ TEST_CASE("the trousers saved by 0.1 open, with the same lengths and their avata
     EXPECT_NEAR(shapes[front].length(frontInseam), (std::hypot(7.5, 64.0)), "front inseam");
     EXPECT_NEAR(shapes[back].length(backInseam), (std::hypot(14.5, 62.8)), "back inseam");
     EXPECT_NEAR(shapes[leftFront].length(frontBody.top()), (19.0), "the left leg, a mirrored instance");
-    EXPECT((doc.get(front).name == "right front" && doc.get(front).arrangement.x == -11.5 && doc.get(front).arrangement.wrap == 180.0), "where it stands in space");
+    EXPECT((doc.get(front).name == "right front" && doc.get(front).arrangement.at.x == -11.5 && doc.get(front).arrangement.wrap == 180.0), "where it stands in space");
     REQUIRE(doc.avatar());
     EXPECT((doc.avatar()->name == "avatar.obj" && doc.avatar()->points.size() == 4 && doc.avatar()->triangles.size() == 4 &&
             doc.avatar()->points[0] == Vec3{-6.312365, 0.0, 7.981731}),
@@ -543,7 +545,7 @@ TEST_CASE("the trousers saved by 0.1 open, with the same lengths and their avata
 TEST_CASE("a saved file cut short or with a word changed opens or says on which line it is wrong")
 {
     std::size_t opened = 0, refused = 0;
-    for (const char* text : {trousersAsWrittenBy01, piecesAsWrittenBy01}) {
+    for (const char* text : {trousersText, piecesText}) {
         testing::forEachDamaged(text, [&](const std::string& damaged) {
             INFO(damaged);
             const std::variant<SavedScene, FileError> read = fromText(damaged);
@@ -565,17 +567,17 @@ TEST_CASE("a saved file cut short or with a word changed opens or says on which 
     EXPECT((opened > 100 && refused > 1000), "both happen: the damage is of both kinds");
 }
 
-TEST_CASE("every other operation saved by 0.1 opens, with the same lengths")
+TEST_CASE("the kept pieces hold every operation, and open with their lengths")
 {
-    const Document doc = opened(piecesAsWrittenBy01);
+    const Document doc = opened(piecesText);
     std::vector<std::size_t> kinds;
-    for (const char* text : {trousersAsWrittenBy01, piecesAsWrittenBy01}) {
+    for (const char* text : {trousersText, piecesText}) {
         const Document each = opened(text);
         for (PanelId panel : each.panels())
             for (OpId op : each.operations(panel))
                 if (const std::size_t kind = each.get(op).index(); std::find(kinds.begin(), kinds.end(), kind) == kinds.end()) kinds.push_back(kind);
     }
-    EXPECT((kinds.size() == 15), "the two files hold every operation 0.1 has");
+    EXPECT((kinds.size() == std::variant_size_v<OpData>), "the two files hold every operation there is");
 
     const PanelId half{5}, rest{14}, twin{16}, ring{18}, disc{20}, slice{22}, hem{24};
     const OpRef<Rect> body(OpId{6}), skirt(OpId{25});
@@ -598,11 +600,11 @@ TEST_CASE("every other operation saved by 0.1 opens, with the same lengths")
     EXPECT_NEAR((valueOf(doc.get(Param{4}).value, shapes).value()), (4.0), "a formula with every kind of step");
     EXPECT((doc.get(half).angle == 30.0 && doc.get(half).particleDistance == 1.5 && doc.get(rest).construction && !doc.enabled(OpId{7})),
            "a turned panel, its particle distance, a base piece and a step switched off");
-    EXPECT((doc.get(half).arrangement == Arrangement{.placed = true, .x = 1, .y = 100, .z = 25.5, .turn = 90, .tilt = -5, .roll = 180, .wrap = 60, .anchor = Vec2{7.5, 58.25}}),
+    EXPECT((doc.get(half).arrangement == Arrangement{.placed = true, .at = {1, 100, 25.5}, .turn = 90, .tilt = -5, .roll = 180, .wrap = 60, .anchor = Vec2{7.5, 58.25}}),
            "an arrangement in space, with its anchor");
     EXPECT((doc.avatar() != nullptr), "and the avatar");
 
-    const SceneState left = scene(piecesAsWrittenBy01).state;
+    const SceneState left = scene(piecesText).state;
     EXPECT((left.frozen == std::vector<PanelId>{twin} && left.hidden == std::vector<PanelId>{ring} && left.hiddenSeams == std::vector<SeamId>{SeamId{30}}),
            "what was frozen and hidden");
     EXPECT((left.bodyHidden && left.bodySeeThrough), "the body's looks");
@@ -614,4 +616,103 @@ TEST_CASE("every other operation saved by 0.1 opens, with the same lengths")
            "a panel's cloth, particle by particle");
     EXPECT((left.drape->panels.back().panel == twin && left.drape->panels.back().at.size() == 4 && left.drape->panels.back().triangles.size() == 2),
            "and the next one's");
+}
+
+TEST_CASE("the kept texts are written back to the letter")
+{
+    for (const char* text : {trousersText, piecesText, bandText}) {
+        const SavedScene read = scene(text);
+        CHECK(toText(read.document, read.state) == text);
+    }
+}
+
+TEST_CASE("a file is written to the letter")
+{
+    Document doc;
+    const Param waist = doc.add(Parameter{.name = "waist \"w\"", .value = 70.1});
+    const Param share = doc.add(Parameter{.name = "share", .value = min(max(-Expr(waist), 1e-7), abs(Expr(waist) / 3)) * 100000.0 - 1e20, .unit = Unit::Fraction});
+    const PanelId half = doc.add(Panel{.name = "half", .at = {100000, -1.0 / 3.0}, .angle = -0.0, .particleDistance = 1.5});
+    doc.arrange(half, Arrangement{.placed = true, .at = {0.1, 100, 1e21}, .turn = 90, .tilt = -5, .roll = 180, .wrap = 60, .anchor = Vec2{7.5, 2.0 / 3.0}});
+    const OpRef<Rect> rect = doc.add(half, Rect{.width = waist + share, .height = 60});
+    const OpRef<LineBetween> line = doc.add(half, LineBetween{.from = {rect.left(), 0.5}, .to = {rect.right(), 0.25}});
+    const OpRef<Cut> cut = doc.add(half, Cut{.along = line.line(), .keep = Cut::Side::Right});
+    const OpRef<Mirror> mirror = doc.add(half, Mirror{.across = cut.farPart(rect.left()), .appliedLast = false});
+    const OpRef<AdjustPoint> adjust = doc.add(half, AdjustPoint{.corner = mirror.image(rect.bottomLeft()), .dx = 1, .dy = 2});
+    doc.setEnabled(adjust, false);
+    doc.add(half, SetLength{.edge = EdgeRef{}, .length = 5, .keeping = SetLength::Keeping::End});
+    const PanelId twin = doc.add(Panel{.name = "twin", .construction = true});
+    doc.add(twin, Instance{.source = half, .mirrored = true});
+    const PanelId rest = doc.add(Panel{.name = "rest"});
+    doc.add(rest, Offcut{.of = cut});
+    const SeamId seam = doc.add(Seam{.a = {half, mirror.image(rect.top())}, .b = {twin, rect.bottom()}, .reversed = true});
+    doc.setAvatar(std::make_shared<const Avatar>(Avatar{.name = "me.obj",
+                                                        .points = {{0, 0, 0}, {100000, 1.0 / 7.0, -1e-9}, {0.1, 1e21, -0.0}},
+                                                        .triangles = {{0, 1, 2}},
+                                                        .readAs = {.unit = 2.54, .rescale = 1.0 / 3.0, .up = Axis::Z, .facing = Axis::MinusY, .moved = {1, -2.5, 100000}}}));
+    const SceneState state{.frozen = {twin},
+                           .hidden = {rest},
+                           .hiddenSeams = {seam},
+                           .bodyHidden = true,
+                           .bodySeeThrough = true,
+                           .drape = SavedDrape{.time = 2.0 / 3.0,
+                                               .sewing = true,
+                                               .panels = {{.panel = half,
+                                                           .anchor = {15, 1.0 / 3.0},
+                                                           .flat = {{0, 0}, {100000, 0}, {0, 40}},
+                                                           .at = {{-1.0 / 7.0, 100, 2}, {29, 99.5, 2}, {0, 140, -1e-9}},
+                                                           .triangles = {{0, 1, 2}}}}}};
+
+    const std::string written = toText(doc, state);
+    const std::string expected = R"(twintailor 1
+next 15
+parameter 1 "waist \"w\"" n 70.1
+parameter 2 "share" - * min max neg p 1 n 1e-07 abs / p 1 n 3 n 1e+05 n 1e+20 unit fraction
+panel 3 "half" 0 1e+05 -0.3333333333333333 -0 1.5
+arrange 0.1 100 1e+21 90 -5 180 60 7.5 0.6666666666666666
+op 4 Rect 1 2 + p 1 p 2 n 60 0 0
+op 5 LineBetween 1 2 n 0.5 n 0.25 2 e 4 3 0 e 4 1 0 0
+op 6 Cut 1 0 1 l 5 1 1
+op 7 Mirror 1 0 1 e 4 3 1 6 1 0
+op 8 AdjustPoint 0 2 n 1 n 2 1 c 4 0 1 7 0
+op 9 SetLength 1 1 n 5 1 e 0 0 0 1 2
+panel 10 "twin" 1 0 0 0
+op 11 Instance 1 0 1 P 3 1 1
+panel 12 "rest" 0 0 0 0
+op 13 Offcut 1 0 0 1 6
+seam 14 3 e 4 2 1 7 10 e 4 0 0 1
+frozen 10
+hidden 12
+hiddenseam 14
+body hidden
+body seethrough
+drape 0.6666666666666666 1 1
+cloth 3 15 0.3333333333333333 3 1
+d 0 0 -0.14285714285714285 100 2
+d 1e+05 0 29 99.5 2
+d 0 40 0 140 -1e-09
+f 0 1 2
+avatar "me.obj" 3 1
+import 2.54 0.3333333333333333 z -y 1 -2.5 1e+05
+v 0 0 0
+v 1e+05 0.14285714285714285 -1e-09
+v 0.1 1e+21 -0
+t 0 1 2
+)";
+    INFO(written);
+    CHECK(written == expected);
+}
+
+TEST_CASE("a formula deeper than any typed one saves and opens, and a far deeper one is taken as damage")
+{
+    const auto saved = [](int steps) {
+        Document doc;
+        Expr sum = 1.0;
+        for (int i = 0; i < steps; ++i) sum = sum + 1.0;
+        doc.add(Parameter{.name = "deep", .value = sum});
+        return fromText(toText(doc));
+    };
+    CHECK(std::holds_alternative<SavedScene>(saved(1000)));
+    const std::variant<SavedScene, FileError> damaged = saved(1001);
+    REQUIRE(std::holds_alternative<FileError>(damaged));
+    CHECK(std::get<FileError>(damaged).message == "a formula is nested too deeply");
 }

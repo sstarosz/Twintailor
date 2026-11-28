@@ -5,6 +5,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -49,6 +50,20 @@ struct CornerRef {
     std::vector<OpId> via{};
     friend bool operator==(const CornerRef&, const CornerRef&) = default;
 };
+
+// The edge, or corner, an operation makes in a role of its Edge or Corner enum.
+template <class Role>
+EdgeRef edgeOf(OpId op, Role role) { return {op, std::to_underlying(role)}; }
+template <class Role>
+CornerRef cornerOf(OpId op, Role role) { return {op, std::to_underlying(role)}; }
+
+// What a name is called once its edge or corner has passed through `op`: the
+// image a mirror makes of it, or the further piece a cut or an added point does.
+template <class Name>
+Name passedThrough(Name name, OpId op) {
+    name.via.push_back(op);
+    return name;
+}
 
 // A named internal line, created by a Line operation.
 struct LineRef {

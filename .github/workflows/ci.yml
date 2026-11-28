@@ -94,6 +94,7 @@ jobs:
           (Get-Command cl.exe).Source
           (Get-Command cmake).Source; cmake --version | Select-Object -First 1
           (Get-Command ninja).Source; ninja --version
+          & "$env:VCINSTALLDIR/Tools/Llvm/x64/bin/clang-tidy.exe" --version
 
       - name: Configure
         shell: pwsh
