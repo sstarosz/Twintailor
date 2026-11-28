@@ -395,6 +395,32 @@ TEST_CASE("split is a cut plus its offcut")
     EXPECT((result[removed].edges.empty()), "and has no outline");
 }
 
+TEST_CASE("a piece whose cut is switched off is empty until the cut is switched on")
+{
+    Document doc;
+    const PanelId kept = doc.add(Panel{.name = "kept"});
+    const OpRef<Rect> rect = doc.add(kept, Rect{.width = 40_cm, .height = 20_cm});
+    const OpRef<LineBetween> line = doc.add(kept, LineBetween{.from = {rect.left(), 0.25}, .to = {rect.right(), 0.75}});
+    const OpRef<Cut> cut = doc.add(kept, Cut{.along = line.line(), .keep = Cut::Side::Right});
+    const PanelId piece = doc.add(Panel{.name = "piece"});
+    const OpRef<Offcut> offcut = doc.add(piece, Offcut{.of = cut});
+    const SeamId seam = doc.add(Seam{.a = {kept, cut.edge()}, .b = {piece, cut.edge()}});
+    const Result before = evaluate(doc);
+    REQUIRE((before.ok() && before[seam].sewn()));
+
+    doc.setEnabled(cut, false);
+    const Result off = evaluate(doc);
+    CHECK(off[piece].edges.empty());
+    CHECK(!off[seam].sewn());
+    REQUIRE(off.errors.size() == 1);
+    CHECK(off.failed(offcut));
+    CHECK(off.errors.front().message == "the cut this piece comes from is switched off; switch it on to have the piece back");
+
+    doc.setEnabled(cut, true);
+    const Result on = evaluate(doc);
+    CHECK((on.ok() && on[piece] == before[piece] && on[seam].sewn()));
+}
+
 TEST_CASE("offcuts of each other are an error, not a hang")
 {
     Document doc;

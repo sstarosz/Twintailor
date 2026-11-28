@@ -105,6 +105,9 @@ What comes next is in the [roadmap](../ROADMAP.md).
   brought back by undo is shown and active.
   A panel activated again where cloth has moved into it is pushed apart from it
   at once, which can jolt.
+- A panel made by Split is empty while the cut it comes from is switched off.
+  Switched on again, its cloth starts anew where the panel is arranged; Undo
+  brings the old drape back.
 - A typed formula may hold at most 200 numbers, names, brackets and minus
   signs. Put a part of a longer one in a parameter of its own.
 

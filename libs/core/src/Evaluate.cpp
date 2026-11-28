@@ -350,6 +350,11 @@ private:
             error(op, "the cut this piece comes from no longer exists");
             return;
         }
+        // The other panel is whole then: a piece of it would be there twice.
+        if (!doc_.enabled(cutId)) {
+            error(op, "the cut this piece comes from is switched off; switch it on to have the piece back");
+            return;
+        }
         if (depth_ >= 16) {
             error(op, "panels are cut from each other in a loop");
             return;

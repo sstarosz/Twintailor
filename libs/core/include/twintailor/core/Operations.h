@@ -212,6 +212,7 @@ struct Cut {
 // Starting operation: the piece that a Cut in another panel removes. A cut
 // plus an offcut of it is a split: two panels that share the cut line and
 // follow it when it changes. Edges keep the names they have in the source.
+// While that cut is switched off there is no piece: its panel is empty.
 //
 //   Offcut{.of = hem}      // hem is the OpRef<Cut> in the other panel
 struct Offcut {
