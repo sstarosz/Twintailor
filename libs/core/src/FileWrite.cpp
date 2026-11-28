@@ -18,9 +18,8 @@ namespace {
 
 using Kind = ExprNode::Kind;
 
-// Appends to `out`, as std::format writes it. {} gives a number as the shortest
-// text that reads back as the same one, which an avatar's many thousands use;
-// the pattern's own numbers are written to 17 digits, {:.17g}.
+// Appends to `out`, as std::format writes it: {} gives a number as the shortest
+// text that reads back as the same one, which every number in a file is.
 template <class... Values>
 void add(std::string& out, std::format_string<Values...> format, Values&&... values) {
     std::format_to(std::back_inserter(out), format, std::forward<Values>(values)...);
@@ -39,7 +38,7 @@ std::string quoted(const std::string& text) {
 // A formula in prefix form: "+ p 3 n 1.5" is parameter 3 plus 1.5.
 void write(std::string& out, const ExprNode& node) {
     switch (node.kind) {
-    case Kind::Number: add(out, " n {:.17g}", node.number); return;
+    case Kind::Number: add(out, " n {}", node.number); return;
     case Kind::Parameter: add(out, " p {}", node.parameter.value); return;
     case Kind::Add: out += " +"; break;
     case Kind::Subtract: out += " -"; break;
@@ -116,18 +115,18 @@ std::string toText(const Document& doc, const SceneState& state) {
         const Parameter& parameter = doc.get(id);
         add(out, "parameter {} {}", id.value, quoted(parameter.name));
         write(out, parameter.value);
-        // A length says nothing, as in files before 0.1.1.
+        // A length says nothing: it is what a parameter is unless told.
         if (parameter.unit != Unit::Length) add(out, " unit {}", unitNames[std::to_underlying(parameter.unit)]);
         out += '\n';
     }
     for (PanelId id : doc.panels()) {
         const Panel& panel = doc.get(id);
-        add(out, "panel {} {} {:d} {:.17g} {:.17g} {:.17g}", id.value, quoted(panel.name), panel.construction, panel.at.x, panel.at.y, panel.angle);
-        if (panel.particleDistance) add(out, " {:.17g}", *panel.particleDistance);
+        add(out, "panel {} {} {:d} {} {} {}", id.value, quoted(panel.name), panel.construction, panel.at.x, panel.at.y, panel.angle);
+        if (panel.particleDistance) add(out, " {}", *panel.particleDistance);
         out += '\n';
         if (const Arrangement& in = panel.arrangement; in.placed) {
-            add(out, "arrange {:.17g} {:.17g} {:.17g} {:.17g} {:.17g} {:.17g} {:.17g}", in.at.x, in.at.y, in.at.z, in.turn, in.tilt, in.roll, in.wrap);
-            if (in.anchor) add(out, " {:.17g} {:.17g}", in.anchor->x, in.anchor->y);
+            add(out, "arrange {} {} {} {} {} {} {}", in.at.x, in.at.y, in.at.z, in.turn, in.tilt, in.roll, in.wrap);
+            if (in.anchor) add(out, " {} {}", in.anchor->x, in.anchor->y);
             out += '\n';
         }
         for (OpId op : doc.operations(id)) {

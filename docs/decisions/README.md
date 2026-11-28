@@ -60,3 +60,4 @@ Write "reason not recorded" rather than guessing one.
 | 0028 | [After a crash the work comes back from a copy written after every change](0028-recovery-copy-after-every-change.md) | 28 November 2026 |
 | 0029 | [Core is checked by clang-tidy as it is built](0029-clang-tidy-on-core.md) | 28 November 2026 |
 | 0030 | [The piece a cut removes needs its cut](0030-a-piece-needs-its-cut.md) | 28 November 2026 |
+| 0031 | [Until 0.1 is released, no earlier file is promised to open](0031-no-earlier-file-before-0-1.md) | 28 November 2026 |

@@ -165,9 +165,6 @@ EdgeRef readEdge(Words& words) {
     throw Problem{"an edge was expected"};
 }
 
-// The program was first called Cloth CAD, and the files it wrote then say
-// "clothcad".
-bool isNameOfTheProgram(const std::string& word) { return word == "twintailor" || word == "clothcad"; }
 constexpr long long mostOfAnAvatar = 10'000'000;  // points, or triangles
 
 // An avatar as far as it has been read.
@@ -252,7 +249,7 @@ public:
 
 private:
     void readFirstLine(const std::string& what, Words& words) {
-        if (!isNameOfTheProgram(what)) throw Problem{"this is not a Twintailor file"};
+        if (what != "twintailor") throw Problem{"this is not a Twintailor file"};
         if (words.whole() != 1) throw Problem{"this file was written by a newer version"};
         started_ = true;
     }
@@ -339,7 +336,7 @@ private:
         description.construction = words.whole() != 0;
         description.at = words.vec2();
         description.angle = words.real();
-        if (!words.done()) description.particleDistance = words.particleDistance();  // older files have none
+        if (!words.done()) description.particleDistance = words.particleDistance();  // none: the default
         DocumentAccess::restore(doc_, id, std::move(description));
         panel_ = id;
     }
@@ -353,7 +350,7 @@ private:
         in.tilt = words.real();
         in.roll = words.real();
         in.wrap = words.real();
-        if (!words.done()) in.anchor = words.vec2();  // files before 0.1.1 have none
+        if (!words.done()) in.anchor = words.vec2();  // none: the middle of the outline's box
         doc_.arrange(*panel_, in);
     }
 

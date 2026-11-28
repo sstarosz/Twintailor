@@ -210,8 +210,7 @@ read from a mesh: it is +Z with Y up, and -Y with Z up, as Blender has it.
   carries on from there. A new pattern, or a file saved without an avatar,
   takes the body that is shown. With the shipped avatar a file is about 650 kB,
   about 950 kB with the trousers draped. Names of files and folders may use any
-  letters. Files saved by 0.1 open in every later version, as do the
-  `.clothcad` files saved while the program was called Cloth CAD. A file with a
+  letters. Files saved by 0.1 open in every later version. A file with a
   line that cannot be right (a number that is not one, a particle distance
   outside 0.5 to 5 cm) is not opened, and the line is named.
 - **Unsaved work is not lost by accident**: the title shows "*" while the

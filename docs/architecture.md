@@ -80,10 +80,12 @@ only ones other code may include), `src/` (sources and private headers) and
   [decision 0028](decisions/0028-recovery-copy-after-every-change.md)); an
   unfinished edit and cloth in motion wait. In that copy, and nowhere else, the
   avatar is in a file of its own.
-- **Files that were saved keep opening.** Never change the texts kept in
-  `core/tests/FileTests.cpp`; a change of the format must pass them, and a new
-  kind of line gets a new case with a text of its own. Files of the earlier
-  name (`.clothcad`, first line `clothcad 1`) read as any other.
+- **The file format is held in place by kept texts** in
+  `core/tests/FileTests.cpp`, each read and written back to the letter. Until
+  0.1 is released a change of the format may change them; from then on files
+  that were saved keep opening, the texts are never changed, and a new kind of
+  line gets a case with a text of its own
+  ([decision 0031](decisions/0031-no-earlier-file-before-0-1.md)).
 - **Fields have a contract.** Every formula field is listed in
   `core/Fields.cpp` with its `Limits` and its `Unit`; evaluation reads values
   through that table. A new field without limits is a bug.

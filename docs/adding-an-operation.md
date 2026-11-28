@@ -15,7 +15,7 @@ on an existing struct is usually better than a new struct.
    (one edge) or `Outline.cpp` (a change of the outline).
 4. `libs/core/src/internal/FileFormat.h`: its name in `typeNames` (same order
    as `OpData`, never renamed once released, see
-   [decision 0012](decisions/0012-saved-files-keep-opening.md)) and `extras`
+   [decision 0031](decisions/0031-no-earlier-file-before-0-1.md)) and `extras`
    if it holds more than formulas and references.
 5. Tests: `libs/core/tests/EvaluateTests.cpp` (what it does, how it fails),
    `DocumentTests.cpp` (it survives a copy) and `FileTests.cpp` (it

@@ -479,8 +479,7 @@ void MainWindow::buildMenus() {
     })->setObjectName("fileNew");
     item(file, "Open…", QKeySequence::Open, this, [this] {
         if (!mayDiscard("opening another pattern")) return;
-        const QString path = QFileDialog::getOpenFileName(this, "Open", folderFor(Files::Patterns),
-                                                          "Patterns (*.twintail *.clothcad)");  // the second: saved as Cloth CAD
+        const QString path = QFileDialog::getOpenFileName(this, "Open", folderFor(Files::Patterns), "Patterns (*.twintail)");
         if (!path.isEmpty()) openFile(path);
     })->setObjectName("fileOpen");
     item(file, "Save", QKeySequence::Save, this, [this] { save(); })->setObjectName("fileSave");

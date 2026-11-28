@@ -1,5 +1,8 @@
 # 0012. Files that were saved keep opening
 
+**Until the 0.1 release this is replaced by [0031](0031-no-earlier-file-before-0-1.md), and
+`.clothcad` files are no longer read.**
+
 **Date:** 26 November 2026 (PR #120); confirmed by the owner 27 November 2026,
 when breaking changes after 0.1 were allowed
 **Issues/PRs:** PR #120, PR #170

@@ -3425,16 +3425,14 @@ TEST_CASE("a changed pattern shows '*' and is asked about before New, Open, a sa
     }
 }
 
-TEST_CASE("a pattern saved under the program's earlier name is offered by Open, opens, and is saved where it is", "[qt]")
+TEST_CASE("a saved pattern is offered by Open, opens, and is saved where it is", "[qt]")
 {
     Window w;
-    QTemporaryDir folder(QCoreApplication::applicationDirPath() + "/twintailor-earlier-XXXXXX");
+    QTemporaryDir folder(QCoreApplication::applicationDirPath() + "/twintailor-opened-XXXXXX");
     REQUIRE(folder.isValid());
-    const QString path = folder.filePath("mine.clothcad");
+    const QString path = folder.filePath("mine.twintail");
     setChest(w, "104 cm");
-    std::string text = toText(w.doc(), w.window.session().state());
-    REQUIRE(text.starts_with("twintailor 1\n"));
-    text.replace(0, std::string("twintailor").size(), "clothcad");
+    const std::string text = toText(w.doc(), w.window.session().state());
     {
         QFile file(path);
         REQUIRE(file.open(QIODevice::WriteOnly));
@@ -3443,7 +3441,7 @@ TEST_CASE("a pattern saved under the program's earlier name is offered by Open, 
     {
         Answering answer(QMessageBox::Discard);
         choose(w, "fileOpen");
-        EXPECT((answer.fileDialogs == 1 && answer.fileFilters == QStringList{"Patterns (*.twintail *.clothcad)"}), "Open offers files of both names");
+        EXPECT((answer.fileDialogs == 1 && answer.fileFilters == QStringList{"Patterns (*.twintail)"}), "Open offers pattern files");
     }
     w.window.openSample(0);
     REQUIRE(w.window.openFile(path));
@@ -3453,7 +3451,7 @@ TEST_CASE("a pattern saved under the program's earlier name is offered by Open, 
     choose(w, "fileSave");
     QFile saved(path);
     REQUIRE(saved.open(QIODevice::ReadOnly));
-    EXPECT((!w.window.isWindowModified() && saved.readLine().trimmed() == "twintailor 1"), "Save writes to the same file, under the new name");
+    EXPECT((!w.window.isWindowModified() && QString::fromUtf8(saved.readAll()).contains("108")), "Save writes to the same file");
 }
 
 TEST_CASE("saved as a file, the pattern takes its name and loses the '*'; Save in the question writes it before going on", "[qt]")
