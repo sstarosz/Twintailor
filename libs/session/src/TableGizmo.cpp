@@ -81,8 +81,8 @@ Vec2 moveBy(const TableGizmo&, TableHandle handle, Vec2 pressed, Vec2 now) {
 
 double turnBy(const TableGizmo& gizmo, Vec2 pressed, Vec2 now) {
     const Vec2 from = pressed - gizmo.centre, to = now - gizmo.centre;
-    if (std::hypot(from.x, from.y) < 1e-12 || std::hypot(to.x, to.y) < 1e-12) return 0.0;
-    return degrees(std::atan2(to.y, to.x) - std::atan2(from.y, from.x));
+    if (length(from) < 1e-12 || length(to) < 1e-12) return 0.0;
+    return degrees(angleOf(to) - angleOf(from));
 }
 
 Factors scaleBy(const TableGizmo& gizmo, TableHandle handle, Vec2 pressed, Vec2 now) {

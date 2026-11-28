@@ -291,8 +291,8 @@ private:
         const double half = radians(sweep) / 2.0;
         const double startAngle = -pi / 2.0 - half, endAngle = -pi / 2.0 + half;
         pattern.vertices = {
-            {names.start(), {radius * std::cos(startAngle), radius * std::sin(startAngle)}},
-            {names.end(), {radius * std::cos(endAngle), radius * std::sin(endAngle)}},
+            {names.start(), unitAt(startAngle) * radius},
+            {names.end(), unitAt(endAngle) * radius},
             {names.centre(), centre},
         };
         pattern.edges = {
@@ -313,17 +313,13 @@ private:
         // Hangs downward: centred on the negative y axis.
         const double startAngle = -pi / 2.0 - angle / 2.0;
         const double endAngle = -pi / 2.0 + angle / 2.0;
-        const auto at = [](double radius, double towards) {
-            return Vec2{radius * std::cos(towards), radius * std::sin(towards)};
-        };
-
         const OpRef<RingSector> names(op);
         const Vec2 centre{0.0, 0.0};
         pattern.vertices = {
-            {names.outerStart(), at(outer, startAngle)},
-            {names.outerEnd(), at(outer, endAngle)},
-            {names.innerEnd(), at(inner, endAngle)},
-            {names.innerStart(), at(inner, startAngle)},
+            {names.outerStart(), unitAt(startAngle) * outer},
+            {names.outerEnd(), unitAt(endAngle) * outer},
+            {names.innerEnd(), unitAt(endAngle) * inner},
+            {names.innerStart(), unitAt(startAngle) * inner},
         };
         pattern.edges = {
             {names.outer(), 0, 1, Arc{centre, outer, sweep}},
@@ -475,7 +471,7 @@ private:
             return;
         }
         // The corners slide along the line between them. Start and end follow the outline.
-        const Vec2 along = (end - start) * (1.0 / now);
+        const Vec2 along = normalized(end - start);
         const double growth = *chord - now;
         const double startShare = set.keeping == SetLength::Keeping::Start ? 0.0 : set.keeping == SetLength::Keeping::End ? 1.0 : 0.5;
         const double endShare = 1.0 - startShare;

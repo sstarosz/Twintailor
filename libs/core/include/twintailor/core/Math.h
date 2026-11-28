@@ -4,7 +4,7 @@
 //
 //   Vec2 corner = turned(Vec2{10_cm, 0_cm}, 90_deg);
 //   Vec3 side = normalized(cross(forward, up));
-//   double heading = degrees(std::atan2(corner.y, corner.x));
+//   double heading = degrees(angleOf(corner));
 
 #include <cmath>
 #include <numbers>
@@ -34,6 +34,17 @@ inline double dot(Vec2 a, Vec2 b) { return a.x * b.x + a.y * b.y; }
 // Above 0 when b points counter-clockwise of a, below 0 when clockwise.
 inline double cross(Vec2 a, Vec2 b) { return a.x * b.y - a.y * b.x; }
 inline double length(Vec2 a) { return std::hypot(a.x, a.y); }
+// The direction of `a`, one long; `a` itself when it has no length.
+inline Vec2 normalized(Vec2 a) {
+    const double l = length(a);
+    return l > 0.0 ? a * (1.0 / l) : a;
+}
+// `a` turned a quarter turn counter-clockwise.
+inline Vec2 leftOf(Vec2 a) { return {-a.y, a.x}; }
+// The direction at an angle from the x axis, one long; and the angle of a
+// direction, from -pi to pi. Angles in radians, counter-clockwise.
+inline Vec2 unitAt(double angle) { return {std::cos(angle), std::sin(angle)}; }
+inline double angleOf(Vec2 a) { return std::atan2(a.y, a.x); }
 
 // A point turned `degrees` counter-clockwise about the origin.
 inline Vec2 turned(Vec2 point, double degrees) {

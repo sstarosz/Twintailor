@@ -52,7 +52,7 @@ std::optional<Bounds> bounds(const Pattern& pattern) {
 }
 
 std::optional<OutlinePoint> nearestOnOutline(const Pattern& pattern, Vec2 point) {
-    const std::optional<outline::Nearest> found = outline::nearest(pattern, point);
+    const std::optional<outline::Place> found = outline::nearest(pattern, point);
     if (!found) return std::nullopt;
     const Edge& edge = pattern.edges[found->edge];
     return OutlinePoint{edge.name, found->along, outline::pointAt(pattern, edge, found->along)};
@@ -90,11 +90,9 @@ std::optional<CubicCurve> cubicFromArc(const Pattern& pattern, const Edge& edge)
     const double turn = radians(arc.sweep);
     const double direction = turn >= 0.0 ? 1.0 : -1.0;
     const double reach = 4.0 / 3.0 * std::tan(std::abs(turn) / 4.0) * arc.radius;
-    const double a0 = std::atan2(start.y - arc.center.y, start.x - arc.center.x);
-    const double a1 = std::atan2(end.y - arc.center.y, end.x - arc.center.x);
-    const Vec2 leaving{-std::sin(a0) * direction, std::cos(a0) * direction};
-    const Vec2 arriving{-std::sin(a1) * direction, std::cos(a1) * direction};
-    return CubicCurve{start + leaving * reach, end - arriving * reach};
+    // Which way the arc heads at a point of it: along the circle, the way it turns.
+    const auto heading = [&](Vec2 at) { return leftOf(unitAt(angleOf(at - arc.center))) * direction; };
+    return CubicCurve{start + heading(start) * reach, end - heading(end) * reach};
 }
 
 Pattern turned(const Pattern& pattern, double degrees) {

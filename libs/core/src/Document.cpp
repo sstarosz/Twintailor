@@ -24,6 +24,8 @@ auto* find(Entries& entries, Id id) {
 }
 
 // An operation's entry, in whichever panel holds it; nullptr if none does.
+// A loop of its own: every lookup of an operation comes here, and searching a
+// joined view of the panels' lists is three times as slow.
 template <class Panels>
 auto* findOperation(Panels& panels, OpId operation) {
     for (auto& p : panels)
@@ -228,11 +230,7 @@ void Document::set(OpId operation, ReferenceId reference, const Reference& value
     }
 }
 
-void Document::remove(OpId operation) {
-    for (PanelEntry& p : panels_)
-        if (drop(p.operations, operation) > 0) return;
-    unknown("operation");
-}
+void Document::remove(OpId operation) { drop(entry(panelOf(operation)).operations, operation); }
 
 void Document::setEnabled(OpId operation, bool enabled) { entry(operation).enabled = enabled; }
 

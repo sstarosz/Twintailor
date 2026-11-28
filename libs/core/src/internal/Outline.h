@@ -18,13 +18,15 @@ using Problem = std::optional<std::string>;  // empty: it worked
 // The point a fraction `t` of the way along an edge: 0 is its start, 1 its end.
 Vec2 pointAt(const Pattern& pattern, const Edge& edge, double t);
 
-// The place on the outline nearest to a point: which edge (its index in
-// pattern.edges) and how far along it, from 0 to 1. Empty for an empty outline.
-struct Nearest {
+// A place on the outline: which edge (its index in pattern.edges) and how far
+// along it, from 0 to 1.
+struct Place {
     std::size_t edge = 0;
     double along = 0.0;
 };
-std::optional<Nearest> nearest(const Pattern& pattern, Vec2 point);
+
+// The place on the outline nearest to a point. Empty for an empty outline.
+std::optional<Place> nearest(const Pattern& pattern, Vec2 point);
 
 // Calls `visit` on every position a pattern holds: its corners, the centres of
 // its arcs, the handles of its free curves, its lines and its axes. A position

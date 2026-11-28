@@ -45,7 +45,7 @@ Cubic cubicOf(const Pattern& p, const Edge& e, const CubicCurve& handles) {
 // Where on an arc a point at `angle` lies: 0 at the start, 1 at the end,
 // more than 1 when it is past the end.
 double arcParameter(const Arc& arc, Vec2 start, double angle) {
-    const double startAngle = std::atan2(start.y - arc.center.y, start.x - arc.center.x);
+    const double startAngle = angleOf(start - arc.center);
     const double direction = arc.sweep >= 0.0 ? 1.0 : -1.0;
     double delta = std::fmod((angle - startAngle) * direction, 2.0 * pi);
     if (delta < 0.0) delta += 2.0 * pi;
@@ -90,7 +90,7 @@ std::vector<double> rayHits(const Pattern& p, const Edge& e, Vec2 origin, Vec2 d
         const double root = std::sqrt(discriminant);
         for (double s : {-b - root, -b + root}) {
             const Vec2 point = origin + direction * s;
-            const double angle = std::atan2(point.y - arc.center.y, point.x - arc.center.x);
+            const double angle = angleOf(point - arc.center);
             const double slack = tolerance / std::max(arc.radius * std::abs(radians(arc.sweep)), tolerance);
             if (arcParameter(arc, a, angle) <= 1.0 + slack) hits.push_back(s);
         }
@@ -105,11 +105,6 @@ std::vector<double> rayHits(const Pattern& p, const Edge& e, Vec2 origin, Vec2 d
     if (t >= -slack && t <= 1.0 + slack) hits.push_back(s);
     return hits;
 }
-
-struct Location {
-    std::size_t edge = 0;
-    double t = 0.0;
-};
 
 // The place on one edge nearest to `point`.
 double nearestParameter(const Pattern& p, const Edge& e, Vec2 point) {
@@ -131,7 +126,7 @@ double nearestParameter(const Pattern& p, const Edge& e, Vec2 point) {
         return (low + high) / 2.0;
     }
     if (e.arc) {
-        const double angle = std::atan2(point.y - e.arc->center.y, point.x - e.arc->center.x);
+        const double angle = angleOf(point - e.arc->center);
         const double t = arcParameter(*e.arc, a, angle);
         return t <= 1.0 ? t : length(point - a) < length(point - endOf(p, e)) ? 0.0 : 1.0;
     }
@@ -140,38 +135,31 @@ double nearestParameter(const Pattern& p, const Edge& e, Vec2 point) {
     return lengthSquared > 0.0 ? std::clamp(dot(point - a, along) / lengthSquared, 0.0, 1.0) : 0.0;
 }
 
-// The place on the outline nearest to `point`, if it is on the outline.
-std::optional<Location> locate(const Pattern& p, Vec2 point) {
-    std::optional<Location> best;
-    double bestDistance = 1e-5;
-    for (std::size_t i = 0; i < p.edges.size(); ++i) {
-        const double t = nearestParameter(p, p.edges[i], point);
-        const double distance = length(point - pointAt(p, p.edges[i], t));
-        if (distance < bestDistance) {
-            bestDistance = distance;
-            best = Location{i, t};
-        }
-    }
-    return best;
+// The place on the outline nearest to `point`, if the point is on the outline.
+std::optional<Place> locate(const Pattern& p, Vec2 point) {
+    const std::optional<Place> found = nearest(p, point);
+    if (!found || length(point - pointAt(p, p.edges[found->edge], found->along)) >= 1e-5) return std::nullopt;
+    return found;
 }
 
 // Makes sure there is a vertex at `where` and returns its index. Splitting
 // an edge gives both halves the original name; a cut keeps only one of them.
-uint32_t splitAt(Pattern& p, Location where, const CornerRef& name) {
+uint32_t splitAt(Pattern& p, Place where, const CornerRef& name) {
     const Edge whole = p.edges[where.edge];
-    const Vec2 point = pointAt(p, whole, where.t);
+    const Vec2 point = pointAt(p, whole, where.along);
     if (length(point - startOf(p, whole)) < tolerance) return whole.start;
     if (length(point - endOf(p, whole)) < tolerance) return whole.end;
 
     Edge first = whole, second = whole;
-    if (first.arc) first.arc->sweep *= where.t;
-    if (second.arc) second.arc->sweep *= 1.0 - where.t;
+    if (first.arc) first.arc->sweep *= where.along;
+    if (second.arc) second.arc->sweep *= 1.0 - where.along;
     if (whole.cubic) {
         // De Casteljau: the two halves are exact pieces of the same curve.
         const Cubic c = cubicOf(p, whole, *whole.cubic);
-        const Vec2 a = between(c.p0, c.p1, where.t), b = between(c.p1, c.p2, where.t), d = between(c.p2, c.p3, where.t);
-        first.cubic = CubicCurve{a, between(a, b, where.t)};
-        second.cubic = CubicCurve{between(b, d, where.t), d};
+        const double t = where.along;
+        const Vec2 a = between(c.p0, c.p1, t), b = between(c.p1, c.p2, t), d = between(c.p2, c.p3, t);
+        first.cubic = CubicCurve{a, between(a, b, t)};
+        second.cubic = CubicCurve{between(b, d, t), d};
     }
 
     const auto vertex = static_cast<uint32_t>(p.vertices.size());
@@ -227,19 +215,18 @@ Vec2 pointAt(const Pattern& p, const Edge& e, double t) {
     if (e.cubic) return cubicOf(p, e, *e.cubic).at(t);
     if (!e.arc) return a + (endOf(p, e) - a) * t;
     const Arc& arc = *e.arc;
-    const double angle = std::atan2(a.y - arc.center.y, a.x - arc.center.x) + radians(arc.sweep) * t;
-    return arc.center + Vec2{std::cos(angle), std::sin(angle)} * arc.radius;
+    return arc.center + unitAt(angleOf(a - arc.center) + radians(arc.sweep) * t) * arc.radius;
 }
 
-std::optional<Nearest> nearest(const Pattern& p, Vec2 point) {
-    std::optional<Nearest> best;
+std::optional<Place> nearest(const Pattern& p, Vec2 point) {
+    std::optional<Place> best;
     double bestDistance = 0.0;
     for (std::size_t i = 0; i < p.edges.size(); ++i) {
         const double t = nearestParameter(p, p.edges[i], point);
         const double distance = length(point - pointAt(p, p.edges[i], t));
         if (!best || distance < bestDistance) {
             bestDistance = distance;
-            best = Nearest{i, t};
+            best = Place{i, t};
         }
     }
     return best;
@@ -265,7 +252,7 @@ std::optional<Arc> arcFromBulge(Vec2 a, Vec2 b, double bulge) {
 
     // Signed radius: negative when the arc bulges to the left.
     const double radius = (chord * chord / 4.0 + bulge * bulge) / (2.0 * bulge);
-    const Vec2 left{-along.y / chord, along.x / chord};
+    const Vec2 left = leftOf(normalized(along));
     const Vec2 middle = a + along * 0.5;
     return Arc{middle + left * (radius - bulge), std::abs(radius), degrees(4.0 * std::atan(2.0 * bulge / chord))};
 }
@@ -319,7 +306,7 @@ std::optional<double> chordFor(const Edge& edge, double length) {
 }
 
 std::optional<Vec2> firstHit(const Pattern& pattern, Vec2 origin, double angleDegrees) {
-    const Vec2 direction{std::cos(radians(angleDegrees)), std::sin(radians(angleDegrees))};
+    const Vec2 direction = unitAt(radians(angleDegrees));
     std::optional<double> nearest;
     for (const Edge& e : pattern.edges)
         for (double s : rayHits(pattern, e, origin, direction))
@@ -333,7 +320,7 @@ Problem addPoint(Pattern& pattern, const EdgeRef& edge, double along, const Corn
     if (found == pattern.edges.end()) return "the edge to add a point to does not exist; an earlier operation may have removed it";
     const auto index = static_cast<std::size_t>(found - pattern.edges.begin());
     const std::size_t corners = pattern.vertices.size();
-    splitAt(pattern, Location{index, along}, corner);
+    splitAt(pattern, Place{index, along}, corner);
     if (pattern.vertices.size() == corners) return "the point would be on a corner that is already there; put it further along the edge";
     pattern.edges[index + 1].name = after;
     return std::nullopt;
@@ -341,11 +328,11 @@ Problem addPoint(Pattern& pattern, const EdgeRef& edge, double along, const Corn
 
 Problem cut(Pattern& pattern, Vec2 from, Vec2 to, bool keepLeft,
             const EdgeRef& cutEdge, const CornerRef& startCorner, const CornerRef& endCorner) {
-    const std::optional<Location> fromPlace = locate(pattern, from);
+    const std::optional<Place> fromPlace = locate(pattern, from);
     if (!fromPlace) return "the line no longer starts on the outline";
     const uint32_t start = splitAt(pattern, *fromPlace, startCorner);
 
-    const std::optional<Location> toPlace = locate(pattern, to);
+    const std::optional<Place> toPlace = locate(pattern, to);
     if (!toPlace) return "the line no longer ends on the outline";
     const uint32_t end = splitAt(pattern, *toPlace, endCorner);
 
@@ -385,7 +372,7 @@ Problem mirror(Pattern& pattern, const EdgeRef& axis, OpId mirrorOp) {
     const Vec2 a = startOf(pattern, axisEdge);
     const Vec2 along = endOf(pattern, axisEdge) - a;
     if (length(along) < tolerance) return "the edge to mirror across has no length";
-    const Vec2 unitAlong = along * (1.0 / length(along));
+    const Vec2 unitAlong = normalized(along);
 
     // Everything except the axis edge, walked from the axis' end to its start.
     std::vector<Edge> half;
