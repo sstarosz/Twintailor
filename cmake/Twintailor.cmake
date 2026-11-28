@@ -37,7 +37,10 @@ function(twintailor_clang_tidy target)
     set(command "${TWINTAILOR_CLANG_TIDY_PROGRAM}")
     if(MSVC)
         # CMake's command line leaves clang-tidy thinking exceptions are off.
-        list(APPEND command "--extra-arg=/EHsc")
+        # And a newer MSVC is given -std:c++23, which clang-tidy does not know:
+        # it would read the code as an old C++. The standard is said again, in
+        # words it knows, and its complaint about the others is turned off.
+        list(APPEND command "--extra-arg=/EHsc" "--extra-arg=/std:c++latest" "--extra-arg=-Wno-unused-command-line-argument")
     endif()
     if(TWINTAILOR_WARNINGS_AS_ERRORS)
         list(APPEND command "--warnings-as-errors=*")
