@@ -1,32 +1,21 @@
 #pragma once
-// Internal: geometry on outlines. Included only by core/*.cpp.
+// Internal: changing a whole outline. Included only by core/*.cpp.
 //
-// Every function that changes a Pattern either succeeds or returns a
-// Problem and may leave the pattern half-changed, so callers work on a copy.
+// Every function that returns a Problem either succeeds or says why not, and
+// may then leave the pattern half-changed, so callers work on a copy.
 
 #include <cstddef>
 #include <optional>
 #include <string>
 #include <vector>
 
+#include "internal/Curves.h"
+#include "twintailor/core/Operations.h"
 #include "twintailor/core/Pattern.h"
 
 namespace twintailor::outline {
 
 using Problem = std::optional<std::string>;  // empty: it worked
-
-// The point a fraction `t` of the way along an edge: 0 is its start, 1 its end.
-Vec2 pointAt(const Pattern& pattern, const Edge& edge, double t);
-
-// A place on the outline: which edge (its index in pattern.edges) and how far
-// along it, from 0 to 1.
-struct Place {
-    std::size_t edge = 0;
-    double along = 0.0;
-};
-
-// The place on the outline nearest to a point. Empty for an empty outline.
-std::optional<Place> nearest(const Pattern& pattern, Vec2 point);
 
 // Calls `visit` on every position a pattern holds: its corners, the centres of
 // its arcs, the handles of its free curves, its lines and its axes. A position
@@ -51,24 +40,6 @@ void forEachPoint(Pattern& pattern, const Visit& visit) {
     }
 }
 
-// Whether an arc turning through `sweep` degrees comes back to where it began.
-bool wholeTurn(double sweep);
-// Whether an edge is such an arc: one with no two ends to move apart.
-bool wholeTurn(const Edge& edge);
-
-// An edge's length along its curve.
-double lengthOf(const Pattern& pattern, const Edge& edge);
-
-// The arc through a and b that rises `bulge` above the straight line between
-// them; positive bulges to the right of the direction a -> b, which is
-// outward on a counter-clockwise outline. Empty when bulge is zero.
-std::optional<Arc> arcFromBulge(Vec2 a, Vec2 b, double bulge);
-
-// The arc from a to b that turns through `sweep` degrees (positive is
-// counter-clockwise). Empty when a and b coincide or the sweep is not a
-// proper arc (zero, or a whole turn).
-std::optional<Arc> arcFromSweep(Vec2 a, Vec2 b, double sweep);
-
 // A corner (its index in pattern.vertices) and how far to move it.
 struct CornerMove {
     std::size_t vertex = 0;
@@ -81,14 +52,13 @@ struct CornerMove {
 // where a curved edge would be left with no length.
 Problem moveCorners(Pattern& pattern, const std::vector<CornerMove>& moves);
 
-// How long the straight line between an edge's ends must be for the edge to
-// be `length` long: the same for a straight edge, shorter for an arc, which
-// keeps its angle. Empty for a free curve, which has no such line, and for an
-// edge that is a whole turn.
-std::optional<double> chordFor(const Edge& edge, double length);
+// Gives an edge (its index in pattern.edges) the length `wanted`, by moving its
+// corners along the straight line between them, as `keeping` says.
+Problem setLength(Pattern& pattern, std::size_t index, double wanted, SetLength::Keeping keeping);
 
-// The first point where a ray leaving `origin` meets the outline again.
-std::optional<Vec2> firstHit(const Pattern& pattern, Vec2 origin, double angleDegrees);
+// Makes the outline x times as wide and y times as high, about the middle of
+// its box. A whole turn of a circle can only be scaled evenly.
+Problem scale(Pattern& pattern, double x, double y);
 
 // Cuts along the straight line from -> to (both on the outline) and keeps
 // the part on the left of that direction, or on the right.

@@ -1,5 +1,5 @@
 // Integration tests of saving over a file that another program holds
-// (libs/core, File.cpp): files are written, so they are tested here and not
+// (libs/core, FileDisk.cpp): files are written, so they are tested here and not
 // beside the library, whose unit tests read and write no files. A file is
 // held by reading it, which stops it being replaced on Windows only.
 

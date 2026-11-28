@@ -1,4 +1,5 @@
-// Unit tests of File.cpp: documents as text and as files.
+// Unit tests of FileWrite.cpp and FileRead.cpp: documents written as text and
+// read back.
 
 #include <algorithm>
 #include <cmath>

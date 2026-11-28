@@ -10,9 +10,11 @@ on an existing struct is usually better than a new struct.
    `describeReferences` (what a copy of a panel follows too), and
    `dimensions` if a field is an edge's length.
 3. `libs/core/src/Evaluate.cpp`: an `apply` overload. It never throws: a
-   problem is an error of the result, in a sentence that says what to do.
-4. `libs/core/src/File.cpp`: its name in `typeNames` (same order as `OpData`,
-   never renamed once released, see
+   problem is an error of the result, in a sentence that says what to do. Its
+   geometry goes in `Shapes.cpp` (an outline a panel starts as), `Curves.cpp`
+   (one edge) or `Outline.cpp` (a change of the outline).
+4. `libs/core/src/internal/FileFormat.h`: its name in `typeNames` (same order
+   as `OpData`, never renamed once released, see
    [decision 0012](decisions/0012-saved-files-keep-opening.md)) and `extras`
    if it holds more than formulas and references.
 5. Tests: `libs/core/tests/EvaluateTests.cpp` (what it does, how it fails),

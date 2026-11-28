@@ -8,11 +8,11 @@
 #include <stdexcept>
 #include <utility>
 
-#include "twintailor/core/Drawing.h"
 #include "twintailor/core/Fields.h"
 #include "internal/ExprNode.h"
 #include "internal/Find.h"
 #include "internal/Outline.h"
+#include "internal/Shapes.h"
 
 namespace twintailor {
 
@@ -258,77 +258,15 @@ private:
     // already checked against their limits.
 
     void apply(const Rect&, const std::vector<double>& value, OpId op, bool first, Pattern& pattern) {
-        if (!starts(first, "a rectangle", op)) return;
-        const double width = value[0], height = value[1];
-
-        const OpRef<Rect> names(op);
-        pattern.vertices = {
-            {names.bottomLeft(), {0.0, 0.0}},
-            {names.bottomRight(), {width, 0.0}},
-            {names.topRight(), {width, height}},
-            {names.topLeft(), {0.0, height}},
-        };
-        pattern.edges = {
-            {names.bottom(), 0, 1, std::nullopt},
-            {names.right(), 1, 2, std::nullopt},
-            {names.top(), 2, 3, std::nullopt},
-            {names.left(), 3, 0, std::nullopt},
-        };
+        if (starts(first, "a rectangle", op)) pattern = outline::rectangle(op, value[0], value[1]);
     }
 
     void apply(const Circle&, const std::vector<double>& value, OpId op, bool first, Pattern& pattern) {
-        if (!starts(first, "a circle", op)) return;
-        const double radius = value[0], sweep = value[1];
-        const OpRef<Circle> names(op);
-        const Vec2 centre{0.0, 0.0};
-        if (outline::wholeTurn(sweep)) {
-            // A whole circle: one edge that starts and ends at its lowest point.
-            pattern.vertices = {{names.start(), {0.0, -radius}}};
-            pattern.edges = {{names.arc(), 0, 0, Arc{centre, radius, 360.0}}};
-            return;
-        }
-        // A slice, hanging downward: centred on the negative y axis.
-        const double half = radians(sweep) / 2.0;
-        const double startAngle = -pi / 2.0 - half, endAngle = -pi / 2.0 + half;
-        pattern.vertices = {
-            {names.start(), unitAt(startAngle) * radius},
-            {names.end(), unitAt(endAngle) * radius},
-            {names.centre(), centre},
-        };
-        pattern.edges = {
-            {names.arc(), 0, 1, Arc{centre, radius, sweep}},
-            {names.endSide(), 1, 2, std::nullopt},
-            {names.startSide(), 2, 0, std::nullopt},
-        };
+        if (starts(first, "a circle", op)) pattern = outline::circle(op, value[0], value[1]);
     }
 
     void apply(const RingSector&, const std::vector<double>& value, OpId op, bool first, Pattern& pattern) {
-        if (!starts(first, "a ring sector", op)) return;
-        const double innerLength = value[0], sweep = value[1], depth = value[2];
-
-        const double angle = radians(sweep);
-        const double inner = innerLength / angle;  // arc length = radius * angle
-        const double outer = inner + depth;
-
-        // Hangs downward: centred on the negative y axis.
-        const double startAngle = -pi / 2.0 - angle / 2.0;
-        const double endAngle = -pi / 2.0 + angle / 2.0;
-        const OpRef<RingSector> names(op);
-        const Vec2 centre{0.0, 0.0};
-        pattern.vertices = {
-            {names.outerStart(), unitAt(startAngle) * outer},
-            {names.outerEnd(), unitAt(endAngle) * outer},
-            {names.innerEnd(), unitAt(endAngle) * inner},
-            {names.innerStart(), unitAt(startAngle) * inner},
-        };
-        pattern.edges = {
-            {names.outer(), 0, 1, Arc{centre, outer, sweep}},
-            {names.endSide(), 1, 2, std::nullopt},
-            {names.inner(), 2, 3, Arc{centre, inner, -sweep}},
-            {names.startSide(), 3, 0, std::nullopt},
-        };
-        // A whole turn closes on itself: the two sides are one seam, not edges.
-        if (outline::wholeTurn(sweep)) pattern.edges[1].seam = pattern.edges[3].seam = true;
+        if (starts(first, "a ring sector", op)) pattern = outline::ringSector(op, value[0], value[1], value[2]);
     }
 
     void apply(const Instance& instance, const std::vector<double>&, OpId op, bool first, Pattern& pattern) {
@@ -453,39 +391,10 @@ private:
 
     void apply(const SetLength& set, const std::vector<double>& value, OpId op, bool first, Pattern& pattern) {
         if (!modifies(first, "a length", op, pattern)) return;
-        const Edge* found = named(pattern.edges, set.edge, op, "the edge to give a length");
-        if (!found) return;
-        const Edge& edge = *found;
-        if (edge.seam) {
-            error(op, "this edge is the closing slit of a whole ring, which is not an edge of the cloth and has no length");
-            return;
-        }
-        if (edge.cubic) {
-            error(op, "a free curve cannot be given a length: shape it with its handles, or set the length of an edge next to it");
-            return;
-        }
-        const std::optional<double> chord = outline::chordFor(edge, value[0]);
-        if (!chord) {
-            error(op, "a whole turn of a circle has no ends to move; change its radius instead");
-            return;
-        }
-        const Vec2 start = pattern.vertices[edge.start].position, end = pattern.vertices[edge.end].position;
-        const double now = length(end - start);
-        if (now < 1e-7) {
-            error(op, "the edge has no length to stretch: its two corners are in the same place");
-            return;
-        }
-        // The corners slide along the line between them. Start and end follow the outline.
-        const Vec2 along = normalized(end - start);
-        const double growth = *chord - now;
-        const double startShare = set.keeping == SetLength::Keeping::Start ? 0.0 : set.keeping == SetLength::Keeping::End ? 1.0 : 0.5;
-        const double endShare = 1.0 - startShare;
-        attempt(pattern, op, [&](Pattern& changed) {
-            return outline::moveCorners(changed, {
-                {edge.start, along * (-growth * startShare)},
-                {edge.end, along * (growth * endShare)},
-            });
-        });
+        const Edge* edge = named(pattern.edges, set.edge, op, "the edge to give a length");
+        if (!edge) return;
+        const auto index = static_cast<std::size_t>(edge - pattern.edges.data());
+        attempt(pattern, op, [&](Pattern& changed) { return outline::setLength(changed, index, value[0], set.keeping); });
     }
 
     void apply(const AddPoint& point, const std::vector<double>& value, OpId op, bool first, Pattern& pattern) {
@@ -498,34 +407,7 @@ private:
 
     void apply(const Scale&, const std::vector<double>& value, OpId op, bool first, Pattern& pattern) {
         if (!modifies(first, "a scale", op, pattern)) return;
-        const double x = value[0], y = value[1];
-        const bool evenly = std::abs(x - y) < 1e-12;
-        if (!evenly)
-            for (const Edge& e : pattern.edges)
-                if (outline::wholeTurn(e)) {
-                    error(op, "a whole circle can only be scaled evenly: give x and y the same scale, or change its radius instead");
-                    return;
-                }
-        const std::optional<Bounds> box = bounds(pattern);
-        if (!box) return;
-        const Vec2 middle = (box->min + box->max) * 0.5;
-        const auto scaled = [&](Vec2 p) { return Vec2{middle.x + (p.x - middle.x) * x, middle.y + (p.y - middle.y) * y}; };
-        attempt(pattern, op, [&](Pattern& changed) -> outline::Problem {
-            outline::forEachPoint(changed, [&](Vec2& p) { p = scaled(p); });
-            for (Edge& e : changed.edges) {
-                if (!e.arc) continue;
-                if (evenly) {
-                    e.arc->radius *= x;
-                    continue;
-                }
-                // Stretched one way more than the other, an arc stays a circular
-                // arc through the same angle, between its moved ends.
-                const std::optional<Arc> arc = outline::arcFromSweep(changed.vertices[e.start].position, changed.vertices[e.end].position, e.arc->sweep);
-                if (!arc) return "a curved edge would have no length at this scale";
-                e.arc = arc;
-            }
-            return std::nullopt;
-        });
+        attempt(pattern, op, [&](Pattern& changed) { return outline::scale(changed, value[0], value[1]); });
     }
 
     const Document& doc_;

@@ -21,7 +21,7 @@ constexpr std::string_view degreeSign = "\u00B0";  // °, as UTF-8
 
 // How many numbers, names, brackets and minus signs a typed formula may hold:
 // far more than anyone writes, and few enough that reading it never runs out of
-// stack and that a file holding it opens (File.cpp).
+// stack and that a file holding it opens (FileRead.cpp).
 constexpr int mostParts = 200;
 
 // Recursive descent. Each level returns nothing after recording an error.

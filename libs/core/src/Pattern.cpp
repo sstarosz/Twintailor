@@ -2,8 +2,8 @@
 
 #include <algorithm>
 
+#include "internal/Curves.h"
 #include "internal/Find.h"
-#include "internal/Outline.h"
 
 namespace twintailor {
 

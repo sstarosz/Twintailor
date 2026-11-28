@@ -4,6 +4,7 @@
 #include <cmath>
 #include <ranges>
 
+#include "internal/Curves.h"
 #include "internal/Outline.h"
 
 namespace twintailor {
